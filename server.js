@@ -214,6 +214,32 @@ section{padding:140px 6vw;position:relative}
 }
 .preview-note .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);margin-top:7px;flex:none}
 
+/* ---------- modelo cards com carro SVG de fundo ---------- */
+.modelos-grid{margin-top:70px;display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--line)}
+@media (max-width:820px){.modelos-grid{grid-template-columns:1fr}}
+.modelo-card{
+  position:relative;background:var(--bg);padding:44px 38px 38px;
+  min-height:340px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;
+}
+.modelo-car-svg{position:absolute;top:36px;right:-10px;width:78%;opacity:.55;pointer-events:none}
+.modelo-kicker{font-size:12px;letter-spacing:.1em;color:var(--gold-dim);position:relative;z-index:2}
+.modelo-name{font-family:'Bebas Neue';font-size:clamp(30px,4vw,44px);position:relative;z-index:2;margin-top:6px}
+.modelo-tag{font-size:14px;color:var(--text-dim);max-width:320px;margin-top:10px;position:relative;z-index:2}
+.modelo-specs{list-style:none;display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;position:relative;z-index:2}
+.modelo-specs li{font-size:12px;color:var(--text-dim)}
+.modelo-specs li::before{content:'—';color:var(--gold);margin-right:6px}
+.modelo-price{margin-top:24px;position:relative;z-index:2}
+.modelo-price span{display:block;font-size:11px;letter-spacing:.08em;color:var(--text-dim)}
+.modelo-price strong{font-family:'Bebas Neue';font-size:30px;color:var(--gold)}
+
+/* ---------- motor ---------- */
+.motor-wrap{margin-top:70px;display:grid;grid-template-columns:1.15fr .85fr;gap:60px;align-items:center}
+@media (max-width:900px){.motor-wrap{grid-template-columns:1fr}}
+.motor-svg-box{background:var(--bg-alt);border:1px solid var(--line);padding:20px}
+.motor-specs{border-top:1px solid var(--line)}
+.motor-specs .stat-row{padding:20px 0}
+.motor-specs .stat-value{font-size:30px}
+
 /* ---------- carreiras ---------- */
 .carreiras{
   display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:80px;
@@ -264,6 +290,7 @@ footer{
   <div class="nav-links">
     <a href="#sobre">Sobre</a>
     <a href="#linha">Linha</a>
+    <a href="#motor">Motor</a>
     <a href="#carreiras">Carreiras</a>
     <a href="#investir">Investir</a>
   </div>
@@ -278,9 +305,9 @@ footer{
   </h1>
   <p class="hero-sub">Projetamos, fabricamos e entregamos veículos com a mesma régua: precisão de linha de montagem e obsessão pelo detalhe. Esta é a Auron.</p>
   <div class="hero-meta">
-    <div><strong>03</strong>modelos em linha</div>
-    <div><strong>2026</strong>ano de fundação</div>
-    <div><strong>01</strong>fábrica-sede</div>
+    <div><strong>04</strong>modelos em linha</div>
+    <div><strong>2018</strong>ano de fundação</div>
+    <div><strong>03</strong>unidades operacionais</div>
   </div>
 </header>
 
@@ -288,11 +315,11 @@ footer{
   <div class="eyebrow reveal">Sobre a Auron</div>
   <h2 class="section-title reveal reveal-delay-1">Da chapa de aço<br>ao showroom.</h2>
   <div class="sobre-grid">
-    <p class="section-lede reveal reveal-delay-2">A Auron nasce para ocupar o espaço entre a engenharia pesada e a experiência de quem compra o carro pronto. Uma única companhia cuidando de toda a cadeia: fábrica própria, concessionária própria, padrão único do primeiro parafuso à entrega das chaves.</p>
+    <p class="section-lede reveal reveal-delay-2">A Auron nasce para ocupar o espaço entre a engenharia pesada e a experiência de quem compra o carro pronto. Uma única companhia cuidando de toda a cadeia: fábrica própria, concessionária própria, padrão único do primeiro parafuso à entrega das chaves. Três unidades, uma só régua de qualidade — Auron Company Center (fábrica), Auron Dealership (concessionária) e Auron Company Invest (holding financeira).</p>
     <div class="sobre-stats reveal reveal-delay-3">
-      <div class="stat-row"><span class="stat-label">Capacidade de produção</span><span class="stat-value">40/dia</span></div>
-      <div class="stat-row"><span class="stat-label">Postos de trabalho diretos</span><span class="stat-value">180</span></div>
-      <div class="stat-row"><span class="stat-label">Concessionárias planejadas</span><span class="stat-value">06</span></div>
+      <div class="stat-row"><span class="stat-label">Exportações realizadas</span><span class="stat-value">4.817</span></div>
+      <div class="stat-row"><span class="stat-label">Satisfação jurídica e legal</span><span class="stat-value">97,3%</span></div>
+      <div class="stat-row"><span class="stat-label">Reputação geral de mercado</span><span class="stat-value">78%</span></div>
     </div>
   </div>
 </section>
@@ -300,35 +327,143 @@ footer{
 <section id="linha" class="section-alt">
   <div class="eyebrow reveal">Linha de produção</div>
   <h2 class="section-title reveal reveal-delay-1">Os modelos<br>Auron.</h2>
-  <p class="section-lede reveal reveal-delay-2">Três modelos abrem a linha. As fichas técnicas completas e os modelos 3D interativos entram no ar nas próximas semanas — hoje, a apresentação oficial dos nomes e posicionamento.</p>
+  <p class="section-lede reveal reveal-delay-2">Quatro modelos abrem a linha MVIST, da mobilidade elétrica ao esportivo de alta performance. Fichas técnicas completas e modelos 3D interativos entram no ar nas próximas semanas.</p>
 
-  <div class="linha-list">
-    <div class="linha-item reveal">
-      <span class="linha-num">01</span>
-      <span class="linha-name">Auron Ferro</span>
-      <span class="linha-tag">Esportivo de entrada</span>
-      <span class="linha-status">Em fábrica</span>
-      <span class="linha-arrow">→</span>
+  <div class="modelos-grid">
+    <div class="modelo-card reveal">
+      <svg class="modelo-car-svg" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+        <path d="M40 130 Q50 95 100 88 L140 60 Q170 48 220 50 L270 60 Q310 68 330 95 L350 130 Z" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <path d="M140 60 L160 68 L245 68 L270 60" fill="none" stroke="#c9a24b" stroke-width="1" opacity=".5"/>
+        <circle cx="105" cy="132" r="24" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <circle cx="285" cy="132" r="24" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <line x1="40" y1="130" x2="350" y2="130" stroke="#c9a24b" stroke-width="1" opacity=".4"/>
+      </svg>
+      <span class="modelo-kicker">01 — SUV moderno</span>
+      <h3 class="modelo-name">Auron MVIST X1</h3>
+      <p class="modelo-tag">Confortável e tecnológico para o uso diário, com assistente de condução.</p>
+      <ul class="modelo-specs">
+        <li>Motor 1.5 Turbo</li><li>Central multimídia 10"</li><li>Assistente de condução</li>
+      </ul>
+      <div class="modelo-price"><span>A partir de</span><strong>R$ 129.990</strong></div>
     </div>
-    <div class="linha-item reveal reveal-delay-1">
-      <span class="linha-num">02</span>
-      <span class="linha-name">Auron Vetor</span>
-      <span class="linha-tag">Sedã executivo</span>
-      <span class="linha-status">Em fábrica</span>
-      <span class="linha-arrow">→</span>
+
+    <div class="modelo-card reveal reveal-delay-1">
+      <svg class="modelo-car-svg" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+        <path d="M35 128 Q45 100 90 92 L130 66 Q165 52 225 54 L275 66 Q315 76 335 100 L355 128 Z" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <path d="M130 66 L150 72 L250 72 L275 66" fill="none" stroke="#c9a24b" stroke-width="1" opacity=".5"/>
+        <circle cx="100" cy="130" r="23" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <circle cx="290" cy="130" r="23" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <line x1="35" y1="128" x2="355" y2="128" stroke="#c9a24b" stroke-width="1" opacity=".4"/>
+      </svg>
+      <span class="modelo-kicker">02 — Esportivo</span>
+      <h3 class="modelo-name">Auron MVIST GT</h3>
+      <p class="modelo-tag">Desempenho e design esportivo: 0 a 100 km/h em 5,4s, modo Sport dedicado.</p>
+      <ul class="modelo-specs">
+        <li>Motor 2.0 Turbo</li><li>200 cv de potência</li><li>Modo Sport</li>
+      </ul>
+      <div class="modelo-price"><span>A partir de</span><strong>R$ 179.990</strong></div>
     </div>
-    <div class="linha-item reveal reveal-delay-2">
-      <span class="linha-num">03</span>
-      <span class="linha-name">Auron Marco</span>
-      <span class="linha-tag">SUV de linha</span>
-      <span class="linha-status">Pré-produção</span>
-      <span class="linha-arrow">→</span>
+
+    <div class="modelo-card reveal reveal-delay-2">
+      <svg class="modelo-car-svg" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+        <path d="M38 129 Q48 98 95 90 L135 63 Q168 50 222 52 L272 63 Q312 72 332 98 L352 129 Z" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <path d="M135 63 L155 70 L248 70 L272 63" fill="none" stroke="#c9a24b" stroke-width="1" opacity=".5"/>
+        <circle cx="102" cy="131" r="23" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <circle cx="288" cy="131" r="23" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <path d="M95 100 L110 100" stroke="#c9a24b" stroke-width="1" opacity=".5"/>
+        <line x1="38" y1="129" x2="352" y2="129" stroke="#c9a24b" stroke-width="1" opacity=".4"/>
+      </svg>
+      <span class="modelo-kicker">03 — Mobilidade elétrica</span>
+      <h3 class="modelo-name">Auron MVIST E-ONE</h3>
+      <p class="modelo-tag">100% elétrico, autonomia de até 450 km e carregamento rápido.</p>
+      <ul class="modelo-specs">
+        <li>100% elétrico</li><li>450 km de autonomia</li><li>Carregamento rápido</li>
+      </ul>
+      <div class="modelo-price"><span>A partir de</span><strong>R$ 199.990</strong></div>
+    </div>
+
+    <div class="modelo-card reveal reveal-delay-3">
+      <svg class="modelo-car-svg" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 128 Q42 97 88 89 L128 62 Q165 48 228 50 L280 62 Q320 72 340 98 L360 128 Z" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <path d="M128 62 L148 69 L254 69 L280 62" fill="none" stroke="#c9a24b" stroke-width="1" opacity=".5"/>
+        <circle cx="98" cy="130" r="24" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <circle cx="292" cy="130" r="24" fill="none" stroke="#c9a24b" stroke-width="1.4" opacity=".7"/>
+        <line x1="32" y1="128" x2="360" y2="128" stroke="#c9a24b" stroke-width="1" opacity=".4"/>
+      </svg>
+      <span class="modelo-kicker">04 — Sedã premium</span>
+      <h3 class="modelo-name">Auron MVIST LUX</h3>
+      <p class="modelo-tag">Conforto e sofisticação: acabamento premium, teto solar panorâmico, bancos em couro.</p>
+      <ul class="modelo-specs">
+        <li>Acabamento premium</li><li>Teto solar panorâmico</li><li>Bancos em couro</li>
+      </ul>
+      <div class="modelo-price"><span>A partir de</span><strong>R$ 219.990</strong></div>
     </div>
   </div>
 
   <div class="preview-note reveal reveal-delay-3">
     <span class="dot"></span>
     <span>Visualização 3D dos modelos: em desenvolvimento. Esta apresentação traz o posicionamento de marca e a estrutura da linha — os modelos interativos entram nesta mesma página assim que estiverem prontos.</span>
+  </div>
+</section>
+
+<section id="motor">
+  <div class="eyebrow reveal">Engenharia sob o capô</div>
+  <h2 class="section-title reveal reveal-delay-1">O motor<br>por trás do GT.</h2>
+  <p class="section-lede reveal reveal-delay-2">4 cilindros em linha, 4 tempos, desenvolvido para equilibrar resposta imediata e eficiência no dia a dia. Este é o coração do Auron MVIST GT.</p>
+
+  <div class="motor-wrap">
+    <div class="motor-svg-box reveal reveal-delay-3">
+      <svg viewBox="0 0 400 380" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <rect x="130" y="20" width="100" height="16" rx="2" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <rect x="140" y="36" width="80" height="20" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <rect x="138" y="56" width="10" height="120" fill="none" stroke="#8a8a90" stroke-width="1"/>
+        <rect x="162" y="56" width="10" height="120" fill="none" stroke="#8a8a90" stroke-width="1"/>
+        <rect x="186" y="56" width="10" height="120" fill="none" stroke="#8a8a90" stroke-width="1"/>
+        <rect x="210" y="56" width="8" height="20" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <rect x="128" y="176" width="100" height="55" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <circle cx="145" cy="185" r="4" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <rect x="118" y="231" width="120" height="120" fill="none" stroke="#8a8a90" stroke-width="1"/>
+        <rect x="152" y="248" width="20" height="34" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <line x1="162" y1="282" x2="162" y2="322" stroke="#c9a24b" stroke-width="1.4"/>
+        <line x1="150" y1="322" x2="174" y2="322" stroke="#c9a24b" stroke-width="1.4"/>
+        <circle cx="162" cy="322" r="6" fill="none" stroke="#c9a24b" stroke-width="1.2"/>
+        <rect x="112" y="351" width="130" height="16" fill="none" stroke="#8a8a90" stroke-width="1"/>
+        <circle cx="130" cy="359" r="6" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <circle cx="177" cy="359" r="6" fill="none" stroke="#c9a24b" stroke-width="1"/>
+        <circle cx="224" cy="359" r="6" fill="none" stroke="#c9a24b" stroke-width="1"/>
+
+        <line x1="230" y1="27" x2="300" y2="27" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="31" font-family="Archivo" font-size="11" fill="#8a8a90">Tampa de válvulas</text>
+
+        <line x1="220" y1="46" x2="300" y2="60" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="64" font-family="Archivo" font-size="11" fill="#8a8a90">Comando de válvulas</text>
+
+        <line x1="218" y1="66" x2="300" y2="95" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="99" font-family="Archivo" font-size="11" fill="#8a8a90">Válvulas de admissão/escape</text>
+
+        <line x1="228" y1="200" x2="300" y2="200" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="204" font-family="Archivo" font-size="11" fill="#8a8a90">Cabeçote</text>
+
+        <line x1="238" y1="290" x2="300" y2="290" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="294" font-family="Archivo" font-size="11" fill="#8a8a90">Bloco do motor</text>
+
+        <line x1="152" y1="265" x2="60" y2="250" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="20" y="254" font-family="Archivo" font-size="11" fill="#8a8a90">Pistão</text>
+
+        <line x1="162" y1="300" x2="60" y2="308" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="20" y="312" font-family="Archivo" font-size="11" fill="#8a8a90">Biela</text>
+
+        <line x1="224" y1="359" x2="300" y2="359" stroke="#8a8a90" stroke-width=".5" stroke-dasharray="2,2"/>
+        <text x="304" y="363" font-family="Archivo" font-size="11" fill="#8a8a90">Virabrequim</text>
+      </svg>
+    </div>
+    <div class="motor-specs reveal reveal-delay-3">
+      <div class="stat-row"><span class="stat-label">Tipo</span><span class="stat-value" style="font-size:16px">4 tempos, 4 cilindros em linha</span></div>
+      <div class="stat-row"><span class="stat-label">Cilindrada</span><span class="stat-value">1.998 cm³</span></div>
+      <div class="stat-row"><span class="stat-label">Potência máxima</span><span class="stat-value">200 cv</span></div>
+      <div class="stat-row"><span class="stat-label">Torque máximo</span><span class="stat-value">205 Nm</span></div>
+      <div class="stat-row"><span class="stat-label">0 a 100 km/h</span><span class="stat-value">5,4s</span></div>
+    </div>
   </div>
 </section>
 
@@ -363,8 +498,8 @@ footer{
 </section>
 
 <footer>
-  <span>Auron Company Invest — Fábrica &amp; Concessionária</span>
-  <span>Apresentação institucional · 2026</span>
+  <span>Auron Company Invest — Fábrica &amp; Concessionária · (14) 98101-6182</span>
+  <span>Fundada em 2018 · Botucatu - SP</span>
 </footer>
 
 <script>
