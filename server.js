@@ -17,8 +17,8 @@ const { renderLoginPage } = require('./login');
 app.use('/auth', authRouter);
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
-app.get('/', (req, res) => {
-  const user = checkAuth(req);
+app.get('/', async (req, res) => {
+  const user = await checkAuth(req);
   if (!user) {
     return res.type('html').send(renderLoginPage());
   }
