@@ -1,11 +1,24 @@
 require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Necessário para req.ip funcionar corretamente atrás de proxy/load balancer (Render, nginx, etc.)
 app.set('trust proxy', 1);
+
+// Rate limit global: 200 requisições por minuto, por IP, em todas as rotas
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(404).send('(404)');
+  },
+});
+app.use(globalLimiter);
 
 app.use(express.json());
 app.use(cookieParser());
@@ -364,6 +377,10 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 </body>
 </html>
 `);
+});
+
+app.use((req, res) => {
+  res.status(404).send('(404)');
 });
 
 app.listen(PORT, () => {
