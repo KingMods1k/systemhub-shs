@@ -15,7 +15,7 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    res.status(404).send('(404)');
+    res.status(404).end();
   },
 });
 app.use(globalLimiter);
@@ -380,7 +380,7 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 });
 
 app.use((req, res) => {
-  res.status(404).send('(404)');
+  res.status(404).end();
 });
 
 app.listen(PORT, () => {
