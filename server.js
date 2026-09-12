@@ -15,10 +15,10 @@ const shsRouter = require('./shs');
 const loginRouter = require('./login');
 
 app.use('/auth', authRouter);
-app.use('/', loginRouter);        // expõe GET /login
+app.use('/', loginRouter);        // expõe GET / (login/registro)
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
-app.get('/', (req, res) => {
+app.get('/home', (req, res) => {
   res.type('html').send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
