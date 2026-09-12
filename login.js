@@ -192,6 +192,10 @@ form{display:flex;flex-direction:column;gap:16px}
   <div class="subtitle" id="subtitle">Acesse sua conta para continuar</div>
 
   <form id="f">
+    <div class="field" id="nameField" style="display:none">
+      <label for="name">Nome</label>
+      <input type="text" id="name" placeholder="Seu nome" maxlength="100">
+    </div>
     <div class="field">
       <label for="email">Email</label>
       <input type="email" id="email" placeholder="seu@email.com" maxlength="150" required>
@@ -217,6 +221,8 @@ const subtitle = document.getElementById('subtitle');
 const submitBtn = document.getElementById('submitBtn');
 const msg = document.getElementById('msg');
 const hint = document.getElementById('hint');
+const nameField = document.getElementById('nameField');
+const nameInput = document.getElementById('name');
 
 toggle.onclick = () => {
   mode = mode === 'login' ? 'register' : 'login';
@@ -225,12 +231,15 @@ toggle.onclick = () => {
   submitBtn.textContent = isLogin ? 'Entrar' : 'Registrar';
   toggle.textContent = isLogin ? 'Nao tem conta? Registrar' : 'Ja tem conta? Entrar';
   hint.textContent = isLogin ? '' : 'Minimo de 8 caracteres.';
+  nameField.style.display = isLogin ? 'none' : 'flex';
+  nameInput.required = !isLogin;
   msg.textContent = '';
   msg.className = 'msg';
 };
 
 document.getElementById('f').onsubmit = async (e) => {
   e.preventDefault();
+  const name = nameInput.value.trim();
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
@@ -239,10 +248,11 @@ document.getElementById('f').onsubmit = async (e) => {
   submitBtn.disabled = true;
 
   try {
+    const body = mode === 'register' ? { name, email, password } : { email, password };
     const r = await fetch('/auth/' + mode, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     });
     const data = await r.json();
     if (!r.ok) {

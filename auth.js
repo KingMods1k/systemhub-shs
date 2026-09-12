@@ -22,6 +22,16 @@ const BCRYPT_ROUNDS = 12;
 const EMAIL_RE = /^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/;
 const EMAIL_MAX_LENGTH = 150;
 
+const NAME_MAX_LENGTH = 100;
+
+function validateName(name) {
+  if (typeof name !== 'string') return 'Nome invalido.';
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return 'O nome precisa ter ao menos 2 caracteres.';
+  if (trimmed.length > NAME_MAX_LENGTH) return `O nome deve ter no maximo ${NAME_MAX_LENGTH} caracteres.`;
+  return null;
+}
+
 function validateEmail(email) {
   if (typeof email !== 'string') return 'Email invalido.';
   if (email.length > EMAIL_MAX_LENGTH) return `O email deve ter no maximo ${EMAIL_MAX_LENGTH} caracteres.`;
@@ -66,10 +76,14 @@ const authLimiter = rateLimit({
 router.post('/register', authLimiter, async (req, res) => {
   try {
     const users = await connect();
-    const { email, password } = req.body || {};
+    const { name, email, password } = req.body || {};
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email e senha sao obrigatorios.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Nome, email e senha sao obrigatorios.' });
+    }
+    const nameError = validateName(name);
+    if (nameError) {
+      return res.status(400).json({ error: nameError });
     }
     const emailError = validateEmail(email);
     if (emailError) {
@@ -79,6 +93,7 @@ router.post('/register', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'A senha precisa ter ao menos 8 caracteres.' });
     }
 
+    const normalizedName = name.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
     const existing = await users.findOne({ _email: normalizedEmail });
@@ -90,6 +105,7 @@ router.post('/register', authLimiter, async (req, res) => {
     const ip = getClientIp(req);
 
     const insertResult = await users.insertOne({
+      _name: normalizedName,
       _email: normalizedEmail,
       _permission: 'user',
       _password: passwordHash,
@@ -100,6 +116,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
     const user = {
       _id: insertResult.insertedId,
+      _name: normalizedName,
       _email: normalizedEmail,
       _permission: 'user',
     };
@@ -110,7 +127,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
     return res.status(201).json({
       ok: true,
-      user: { email: user._email, permission: user._permission },
+      user: { name: user._name, email: user._email, permission: user._permission },
     });
   } catch (err) {
     console.error('Erro no registro:', err);
@@ -155,7 +172,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     return res.json({
       ok: true,
-      user: { email: user._email, permission: user._permission },
+      user: { name: user._name, email: user._email, permission: user._permission },
     });
   } catch (err) {
     console.error('Erro no login:', err);
@@ -201,7 +218,7 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Sessao invalida ou expirada.' });
     }
 
-    req.user = { id: String(user._id), email: user._email, permission: user._permission };
+    req.user = { id: String(user._id), name: user._name, email: user._email, permission: user._permission };
     next();
   } catch (err) {
     console.error('Erro no requireAuth:', err);
@@ -232,7 +249,7 @@ async function checkAuth(req) {
     const user = await users.findOne({ _id: new ObjectId(payload.sub), token });
     if (!user) return null;
 
-    return { id: String(user._id), email: user._email, permission: user._permission };
+    return { id: String(user._id), name: user._name, email: user._email, permission: user._permission };
   } catch (err) {
     console.error('Erro no checkAuth:', err);
     return null;
