@@ -53,7 +53,7 @@ app.get('/', async (req, res) => {
 <meta property="og:site_name" content="Auron Company MVIST">
 <meta property="og:title" content="Auron Company Invest — Engenharia em movimento.">
 <meta property="og:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom: modelos X1, GT, E-ONE e LUX da linha Auron MVIST.">
-<meta property="og:image" content="https://raw.githubusercontent.com/SEU-USUARIO/SEU-REPO/main/og-image.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/KingMods1k/systemhub-shs/main/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://server-for-application.onrender.com">
@@ -62,7 +62,7 @@ app.get('/', async (req, res) => {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Auron Company Invest — Engenharia em movimento.">
 <meta name="twitter:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom.">
-<meta name="twitter:image" content="https://raw.githubusercontent.com/SEU-USUARIO/SEU-REPO/main/og-image.png">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/KingMods1k/systemhub-shs/main/og-image.png">
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700&display=swap');
