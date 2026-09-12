@@ -194,7 +194,7 @@ form{display:flex;flex-direction:column;gap:16px}
   <form id="f">
     <div class="field" id="nameField" style="display:none">
       <label for="name">Nome</label>
-      <input type="text" id="name" placeholder="Seu nome" maxlength="100">
+      <input type="text" id="name" placeholder="Seu nome" maxlength="60">
     </div>
     <div class="field">
       <label for="email">Email</label>

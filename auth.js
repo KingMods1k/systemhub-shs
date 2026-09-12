@@ -22,13 +22,15 @@ const BCRYPT_ROUNDS = 12;
 const EMAIL_RE = /^[A-Za-z0-9.]+@[A-Za-z0-9.]+\.[A-Za-z]{2,}$/;
 const EMAIL_MAX_LENGTH = 150;
 
-const NAME_MAX_LENGTH = 100;
+const NAME_MAX_LENGTH = 60;
+const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ]+)*$/;
 
 function validateName(name) {
   if (typeof name !== 'string') return 'Nome invalido.';
   const trimmed = name.trim();
   if (trimmed.length < 2) return 'O nome precisa ter ao menos 2 caracteres.';
   if (trimmed.length > NAME_MAX_LENGTH) return `O nome deve ter no maximo ${NAME_MAX_LENGTH} caracteres.`;
+  if (!NAME_RE.test(trimmed)) return 'O nome deve conter apenas letras.';
   return null;
 }
 
