@@ -6,6 +6,24 @@ function renderLoginPage() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Acesso — Auron</title>
+<meta name="description" content="Auron Company Invest — Fábrica e concessionária própria. Acesse sua conta para continuar.">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Auron Company MVIST">
+<meta property="og:title" content="Auron Company Invest — Engenharia em movimento.">
+<meta property="og:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom: modelos X1, GT, E-ONE e LUX da linha Auron MVIST.">
+<meta property="og:image" content="https://raw.githubusercontent.com/KingMods1k/systemhub-shs/main/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://systemhub-shs.onrender.com">
+<meta property="og:locale" content="pt_BR">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Auron Company Invest — Engenharia em movimento.">
+<meta name="twitter:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/KingMods1k/systemhub-shs/main/og-image.png">
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700&display=swap');
 
@@ -22,15 +40,14 @@ function renderLoginPage() {
 
 *{margin:0;padding:0;box-sizing:border-box}
 
+html,body{height:100%}
 body{
   background:var(--bg);
   color:var(--text);
   font-family:'Archivo',sans-serif;
   min-height:100vh;
   display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
+  align-items:stretch;
   position:relative;
   overflow:hidden;
 }
@@ -38,36 +55,65 @@ body{
 .bg-glow{
   position:absolute;inset:0;
   background:
-    radial-gradient(ellipse 60% 50% at 70% 20%, rgba(201,162,75,.10), transparent),
-    radial-gradient(ellipse 50% 40% at 20% 80%, rgba(201,162,75,.06), transparent);
+    radial-gradient(ellipse 60% 50% at 80% 15%, rgba(201,162,75,.09), transparent),
+    radial-gradient(ellipse 50% 40% at 15% 85%, rgba(201,162,75,.05), transparent),
+    repeating-linear-gradient(115deg, transparent 0 130px, rgba(255,255,255,.012) 130px 131px);
   pointer-events:none;
+}
+
+.side{
+  flex:1.1;
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:8vw;
+  border-right:1px solid var(--line);
+}
+.side-eyebrow{font-size:13px;color:var(--gold);letter-spacing:.12em;margin-bottom:22px}
+.side-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,5.2vw,68px);line-height:.96;letter-spacing:.01em}
+.side-title em{color:var(--gold);font-style:normal}
+.side-lede{max-width:380px;margin-top:22px;font-size:15px;line-height:1.7;color:var(--text-dim)}
+.side-stats{display:flex;gap:40px;margin-top:48px}
+.side-stats div{font-size:12px;color:var(--text-dim)}
+.side-stats strong{display:block;font-family:'Bebas Neue';font-size:26px;color:var(--text);letter-spacing:.02em}
+@media (max-width:860px){.side{display:none}}
+
+.form-col{
+  flex:1;
+  min-width:340px;
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+@media (max-width:860px){
+  body{min-height:100vh}
+  .form-col{width:100%;min-height:100vh}
 }
 
 .card{
   position:relative;
-  z-index:1;
   width:100%;
-  max-width:400px;
-  background:var(--bg-alt);
-  border:1px solid var(--line);
-  border-radius:6px;
-  padding:44px 36px;
+  max-width:380px;
+  padding:8px 4px;
 }
 
 .mark{
   font-family:'Bebas Neue',sans-serif;
-  font-size:28px;
+  font-size:26px;
   letter-spacing:.08em;
-  text-align:center;
-  margin-bottom:6px;
+  margin-bottom:4px;
 }
 .mark span{color:var(--gold)}
 
 .subtitle{
-  text-align:center;
   font-size:13px;
   color:var(--text-dim);
-  margin-bottom:32px;
+  margin-bottom:36px;
   letter-spacing:.02em;
 }
 
@@ -77,9 +123,9 @@ form{display:flex;flex-direction:column;gap:16px}
 .field label{font-size:12px;color:var(--text-dim);letter-spacing:.04em}
 .field input{
   padding:13px 14px;
-  border-radius:4px;
+  border-radius:2px;
   border:1px solid var(--line);
-  background:var(--bg);
+  background:var(--bg-alt);
   color:var(--text);
   font-size:15px;
   font-family:'Archivo',sans-serif;
@@ -90,12 +136,13 @@ form{display:flex;flex-direction:column;gap:16px}
 .btn{
   padding:14px;
   border:none;
-  border-radius:4px;
+  border-radius:2px;
   font-family:'Archivo',sans-serif;
   font-size:15px;
   font-weight:600;
   cursor:pointer;
-  transition:transform .2s ease, opacity .2s ease;
+  transition:transform .2s ease, opacity .2s ease, background .2s ease;
+  margin-top:6px;
 }
 .btn:active{transform:scale(.98)}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
@@ -117,7 +164,7 @@ form{display:flex;flex-direction:column;gap:16px}
   color:var(--gold);
   cursor:pointer;
   text-align:center;
-  margin-top:4px;
+  margin-top:6px;
   letter-spacing:.02em;
 }
 .toggle:hover{text-decoration:underline}
@@ -128,6 +175,18 @@ form{display:flex;flex-direction:column;gap:16px}
 <body>
 <div class="bg-glow"></div>
 
+<div class="side">
+  <div class="side-eyebrow">Auron Company Invest</div>
+  <h1 class="side-title">Engenharia<br>em <em>movimento.</em></h1>
+  <p class="side-lede">Fábrica e concessionária próprias, do primeiro parafuso à entrega das chaves. Acesse para acompanhar a linha Auron MVIST.</p>
+  <div class="side-stats">
+    <div><strong>04</strong>modelos em linha</div>
+    <div><strong>2018</strong>fundação</div>
+    <div><strong>03</strong>unidades</div>
+  </div>
+</div>
+
+<div class="form-col">
 <div class="card">
   <div class="mark">AURON<span>.</span></div>
   <div class="subtitle" id="subtitle">Acesse sua conta para continuar</div>
@@ -148,6 +207,7 @@ form{display:flex;flex-direction:column;gap:16px}
     <div class="msg" id="msg"></div>
     <div class="toggle" id="toggle">Nao tem conta? Registrar</div>
   </form>
+</div>
 </div>
 
 <script>
