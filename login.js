@@ -1,9 +1,6 @@
-// login.js — página pública com formulário de login/registro
-const express = require('express');
-const router = express.Router();
-
-router.get('/', (req, res) => {
-  res.type('html').send(`<!DOCTYPE html>
+// login.js — HTML do formulário de login/registro (usado na raiz / quando não autenticado)
+function renderLoginPage() {
+  return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -56,14 +53,14 @@ document.getElementById('f').onsubmit = async (e) => {
       msg.textContent = data.error || 'Erro.';
       return;
     }
-    window.location.href = '/shs';
+    window.location.reload();
   } catch (err) {
     msg.textContent = 'Erro de conexão.';
   }
 };
 </script>
 </body>
-</html>`);
-});
+</html>`;
+}
 
-module.exports = router;
+module.exports = { renderLoginPage };

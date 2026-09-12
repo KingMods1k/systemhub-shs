@@ -182,4 +182,22 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ ok: true, user: req.user });
 });
 
-module.exports = { router, requireAuth };
+// --- Verifica sessão sem bloquear a requisição: retorna o user ou null ---
+function checkAuth(req) {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return null;
+
+  let payload;
+  try {
+    payload = jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ? AND token = ?').get(payload.sub, token);
+  if (!user) return null;
+
+  return { id: user.id, email: user._email, permission: user._permission };
+}
+
+module.exports = { router, requireAuth, checkAuth };

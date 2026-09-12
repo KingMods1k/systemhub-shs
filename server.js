@@ -10,15 +10,19 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
 
-const { router: authRouter, requireAuth } = require('./auth');
+const { router: authRouter, requireAuth, checkAuth } = require('./auth');
 const shsRouter = require('./shs');
-const loginRouter = require('./login');
+const { renderLoginPage } = require('./login');
 
 app.use('/auth', authRouter);
-app.use('/', loginRouter);        // expõe GET / (login/registro)
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
-app.get('/home', (req, res) => {
+app.get('/', (req, res) => {
+  const user = checkAuth(req);
+  if (!user) {
+    return res.type('html').send(renderLoginPage());
+  }
+
   res.type('html').send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
