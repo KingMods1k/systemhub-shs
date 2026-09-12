@@ -30,6 +30,10 @@ const { renderLoginPage } = require('./login');
 app.use('/auth', authRouter);
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(require('path').join(__dirname, 'favicon.ico'));
+});
+
 app.get('/', async (req, res) => {
   const user = await checkAuth(req);
   if (!user) {
@@ -42,6 +46,24 @@ app.get('/', async (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Auron Company Invest — Fábrica &amp; Concessionária</title>
+<meta name="description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom: modelos X1, GT, E-ONE e LUX da linha Auron MVIST.">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Auron Company MVIST">
+<meta property="og:title" content="Auron Company Invest — Engenharia em movimento.">
+<meta property="og:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom: modelos X1, GT, E-ONE e LUX da linha Auron MVIST.">
+<meta property="og:image" content="https://raw.githubusercontent.com/SEU-USUARIO/SEU-REPO/main/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://server-for-application.onrender.com">
+<meta property="og:locale" content="pt_BR">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Auron Company Invest — Engenharia em movimento.">
+<meta name="twitter:description" content="Fábrica e concessionária própria de veículos. Da chapa de aço ao showroom.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/SEU-USUARIO/SEU-REPO/main/og-image.png">
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700&display=swap');
 
