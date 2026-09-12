@@ -34,11 +34,30 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'favicon.ico'));
 });
 
+// Formata o nome do usuário pra exibir na barra superior:
+// - 1 palavra: mostra inteira
+// - 2 palavras: primeiro nome + sobrenome (abreviado pra "X." se tiver mais de 3 letras)
+// - 3 palavras: primeiro nome + nome do meio abreviado (mesma regra) + último nome inteiro
+// - 4+ palavras: mostra só o primeiro nome
+function formatDisplayName(rawName) {
+  if (typeof rawName !== 'string') return '';
+  const words = rawName.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+
+  const abbreviate = (word) => (word.length > 3 ? `${word[0]}.` : word);
+
+  if (words.length === 1) return words[0];
+  if (words.length === 2) return `${words[0]} ${abbreviate(words[1])}`;
+  if (words.length === 3) return `${words[0]} ${abbreviate(words[1])} ${words[2]}`;
+  return words[0];
+}
+
 app.get('/', async (req, res) => {
-  const user = await checkAuth(req);
+  const user = await checkAuth(req, res);
   if (!user) {
     return res.type('html').send(renderLoginPage());
   }
+  const displayName = formatDisplayName(user.name);
 
   res.type('html').send(`<!DOCTYPE html>
 <html lang="pt-BR">
@@ -122,9 +141,11 @@ nav{
   mix-blend-mode:difference;
 }
 .nav-mark{font-family:'Bebas Neue';font-size:22px;letter-spacing:.08em}
+.nav-right{display:flex;align-items:center;gap:36px}
 .nav-links{display:flex;gap:36px;font-size:13px;letter-spacing:.04em}
 .nav-links a{color:var(--text);text-decoration:none;opacity:.8;transition:opacity .25s}
 .nav-links a:hover{opacity:1}
+.nav-user{font-family:'Archivo';font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
 @media (max-width:720px){.nav-links{display:none}}
 
 /* ---------- hero ---------- */
@@ -309,12 +330,15 @@ footer{
 
 <nav>
   <div class="nav-mark">AURON</div>
-  <div class="nav-links">
-    <a href="#sobre">Sobre</a>
-    <a href="#linha">Linha</a>
-    <a href="#motor">Motor</a>
-    <a href="#carreiras">Carreiras</a>
-    <a href="#investir">Investir</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#sobre">Sobre</a>
+      <a href="#linha">Linha</a>
+      <a href="#motor">Motor</a>
+      <a href="#carreiras">Carreiras</a>
+      <a href="#investir">Investir</a>
+    </div>
+    <div class="nav-user">${displayName}</div>
   </div>
 </nav>
 
