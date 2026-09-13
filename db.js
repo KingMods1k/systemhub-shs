@@ -8,9 +8,13 @@ if (!MONGO_URI) {
   );
 }
 
-const DB_NAME = process.env.MONGO_DB_NAME || 'shs';
+const DB_NAME = process.env.MONGO_DB_NAME || 'SHS';
+console.log('[db.js] Usando banco: "' + DB_NAME + '" (confira se bate exatamente, maiuscula/minuscula, com o nome no Atlas)');
 
-const client = new MongoClient(MONGO_URI);
+const client = new MongoClient(MONGO_URI, {
+  serverSelectionTimeoutMS: 8000, // falha rapido e com erro claro, em vez de travar ~30s
+  connectTimeoutMS: 8000,
+});
 
 let usersCollection = null;
 let rhsCollection = null;
@@ -21,6 +25,12 @@ let clientConnectPromise = null;
 async function ensureClientConnected() {
   if (!clientConnectPromise) {
     clientConnectPromise = client.connect().then(() => client.db(DB_NAME));
+    // Se a conexao falhar, libera pra tentar de novo na proxima chamada em vez
+    // de ficar preso pra sempre repetindo o mesmo erro guardado em cache.
+    clientConnectPromise.catch((err) => {
+      console.error('[db.js] Falha ao conectar no MongoDB:', err.message);
+      clientConnectPromise = null;
+    });
   }
   return clientConnectPromise;
 }
