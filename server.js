@@ -34,6 +34,24 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'favicon.ico'));
 });
 
+// GET /myhub.js — hub interno, só pra funcionários (permission === 'authentic').
+// requireAuth ja valida o token/cookie (inclusive contra login em outro navegador).
+app.get('/myhub.js', requireAuth, (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  try {
+    // Lazy require: assim o server nao quebra no boot enquanto o arquivo
+    // ./myhub.js ainda nao existir no repo.
+    const { renderMyHub } = require('./myhub');
+    return res.type('html').send(renderMyHub(req.user));
+  } catch (err) {
+    console.error('Erro ao carregar myhub:', err);
+    return res.status(500).json({ error: 'Hub indisponivel no momento.' });
+  }
+});
+
 // Formata o nome do usuário pra exibir na barra superior:
 // - 1 palavra: mostra inteira
 // - 2 palavras: primeiro nome + sobrenome (abreviado pra "X." se tiver mais de 3 letras)
@@ -190,11 +208,12 @@ nav{
 .support-overlay.open .support-dialog{transform:scale(1) translateY(0)}
 .support-dialog h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin-bottom:22px}
 .support-close{
-  position:absolute;top:12px;right:14px;background:none;border:none;
-  color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;
-  transition:color .2s ease, transform .15s ease;
+  position:absolute;top:10px;right:10px;background:none;border:none;
+  color:var(--text-dim);font-size:34px;cursor:pointer;line-height:1;
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;transition:color .2s ease, background .2s ease, transform .15s ease;
 }
-.support-close:hover{color:var(--gold)}
+.support-close:hover{color:var(--gold);background:var(--line)}
 .support-close:active{transform:scale(.85)}
 .support-row{display:flex;align-items:center;justify-content:center;gap:18px}
 @keyframes wa-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
@@ -683,6 +702,7 @@ const btnManageProfile = document.getElementById('btnManageProfile');
 if (btnManageProfile) {
   btnManageProfile.addEventListener('click', () => {
     closeNavDropdown();
+    window.location.href = '/myhub.js';
   });
 }
 
