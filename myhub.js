@@ -293,15 +293,18 @@ async function encryptAndUploadFile(file, funcionarioId) {
   if (!tempRes.ok) throw new Error('Nao foi possivel obter chave temporaria do servidor.');
   const { keyId, publicKey } = await tempRes.json();
 
-  let aesKey, iv, fileBuffer, encryptedCombined;
-  try {
-    aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
-    iv = crypto.getRandomValues(new Uint8Array(12));
-    fileBuffer = await file.arrayBuffer();
-    encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
-  } catch (e) {
-    throw new Error('Falha ao cifrar com AES: ' + e.name + ' — ' + e.message);
-  }
+  console.log('[PEM RECEBIDO - INICIO]');
+  console.log(publicKey);
+  console.log('[PEM RECEBIDO - FIM]');
+  console.log('[PEM length]', publicKey.length);
+  const b64Body = publicKey.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s+/g, '');
+  const invalidChars = b64Body.match(/[^A-Za-z0-9+/=]/g);
+  console.log('[PEM base64 body length]', b64Body.length, 'chars invalidos:', invalidChars);
+
+  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const fileBuffer = await file.arrayBuffer();
+  const encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
 
   // O Web Crypto devolve ciphertext + tag colados (tag = ultimos 16 bytes) —
   // o server espera os dois separados, então separamos aqui antes de enviar.
@@ -309,45 +312,43 @@ async function encryptAndUploadFile(file, funcionarioId) {
   const authTag = combined.slice(combined.length - 16);
   const ciphertext = combined.slice(0, combined.length - 16);
 
-  let rawAesKey, rsaPublicKey, encryptedAesKey;
-  try {
-    rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
-  } catch (e) {
-    throw new Error('Falha ao exportar chave AES: ' + e.name + ' — ' + e.message);
-  }
+  const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+
+  let rsaPublicKey;
   try {
     rsaPublicKey = await importTempRsaPublicKey(publicKey);
+    console.log('[importKey] OK');
   } catch (e) {
-    throw new Error('Falha ao IMPORTAR a chave RSA publica: ' + e.name + ' — ' + e.message + ' | PEM recebido (' + publicKey.length + ' chars): ' + JSON.stringify(publicKey.slice(0, 60)));
-  }
-  try {
-    encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
-  } catch (e) {
-    throw new Error('Falha ao CIFRAR com a chave RSA importada: ' + e.name + ' — ' + e.message + ' | rawAesKey bytes: ' + rawAesKey.byteLength);
+    console.log('[importKey] FALHOU:', e.name, e.message);
+    throw new Error('Falha ao importar a chave RSA: ' + e.name + ' — ' + e.message);
   }
 
-  let uploadRes;
+  let encryptedAesKey;
   try {
-    uploadRes = await fetch('/myhub/documento/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        keyId,
-        funcionarioId,
-        mimetype: file.type || 'application/pdf',
-        encryptedAesKey: bufferToBase64(encryptedAesKey),
-        iv: bufferToBase64(iv),
-        authTag: bufferToBase64(authTag),
-        ciphertext: bufferToBase64(ciphertext),
-      }),
-    });
+    encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
+    console.log('[encrypt RSA-OAEP] OK');
   } catch (e) {
-    throw new Error('Falha de rede ao enviar o arquivo: ' + e.name + ' — ' + e.message);
+    console.log('[encrypt RSA-OAEP] FALHOU:', e.name, e.message);
+    throw new Error('Falha ao cifrar com RSA: ' + e.name + ' — ' + e.message);
   }
+
+  const uploadRes = await fetch('/myhub/documento/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      keyId,
+      funcionarioId,
+      mimetype: file.type || 'application/pdf',
+      encryptedAesKey: bufferToBase64(encryptedAesKey),
+      iv: bufferToBase64(iv),
+      authTag: bufferToBase64(authTag),
+      ciphertext: bufferToBase64(ciphertext),
+    }),
+  });
 
   if (!uploadRes.ok) {
     const data = await uploadRes.json().catch(() => ({}));
-    throw new Error(data.error || ('Falha ao enviar "' + file.name + '" (status ' + uploadRes.status + ').'));
+    throw new Error(data.error || ('Falha ao enviar "' + file.name + '".'));
   }
 }
 
