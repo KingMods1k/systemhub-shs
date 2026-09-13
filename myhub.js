@@ -210,6 +210,7 @@ header{
 
         <button type="submit" class="btn btn-primary" id="submitBtn">Solicitar Admissão</button>
         <div class="msg" id="msg"></div>
+        <textarea id="debugLog" readonly style="display:none;width:100%;min-height:220px;margin-top:14px;background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:10px;border:1px solid var(--line);white-space:pre-wrap;"></textarea>
       </form>
     </div>
   </div>
@@ -241,6 +242,15 @@ const fileInput = document.getElementById('f-documentos');
 const fileHint = document.getElementById('fileHint');
 const processingOverlay = document.getElementById('processingOverlay');
 const processingText = document.getElementById('processingText');
+const debugLog = document.getElementById('debugLog');
+
+function dbg(label, data) {
+  debugLog.style.display = 'block';
+  const line = '[' + new Date().toISOString().slice(11, 19) + '] ' + label +
+    (data !== undefined ? ': ' + (typeof data === 'string' ? data : JSON.stringify(data)) : '');
+  debugLog.value += line + '\n\n';
+  debugLog.scrollTop = debugLog.scrollHeight;
+}
 
 const MAX_FILES = 6;
 
@@ -289,22 +299,25 @@ async function importTempRsaPublicKey(pem) {
 
 // Cifra 1 arquivo (AES-256-GCM + envelope RSA-OAEP com chave temporaria) e envia.
 async function encryptAndUploadFile(file, funcionarioId) {
+  dbg('1. Pedindo chave RSA temporaria ao servidor');
   const tempRes = await fetch('/myhub/documento/rsa-temp');
+  dbg('2. Resposta do /rsa-temp recebida. status', tempRes.status);
   if (!tempRes.ok) throw new Error('Nao foi possivel obter chave temporaria do servidor.');
   const { keyId, publicKey } = await tempRes.json();
+  dbg('3. keyId recebido', keyId);
+  dbg('4. publicKey (PEM) recebido, length=' + publicKey.length, publicKey);
 
-  console.log('[PEM RECEBIDO - INICIO]');
-  console.log(publicKey);
-  console.log('[PEM RECEBIDO - FIM]');
-  console.log('[PEM length]', publicKey.length);
   const b64Body = publicKey.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s+/g, '');
   const invalidChars = b64Body.match(/[^A-Za-z0-9+/=]/g);
-  console.log('[PEM base64 body length]', b64Body.length, 'chars invalidos:', invalidChars);
+  dbg('5. Validacao do corpo base64 do PEM', { base64Length: b64Body.length, charsInvalidos: invalidChars });
 
+  dbg('6. Gerando chave AES-256-GCM no navegador');
   const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const fileBuffer = await file.arrayBuffer();
+  dbg('7. Arquivo lido, bytes=' + fileBuffer.byteLength);
   const encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
+  dbg('8. Arquivo cifrado com AES-GCM. bytes=' + encryptedCombined.byteLength);
 
   // O Web Crypto devolve ciphertext + tag colados (tag = ultimos 16 bytes) —
   // o server espera os dois separados, então separamos aqui antes de enviar.
@@ -313,25 +326,29 @@ async function encryptAndUploadFile(file, funcionarioId) {
   const ciphertext = combined.slice(0, combined.length - 16);
 
   const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+  dbg('9. Chave AES exportada em raw, bytes=' + rawAesKey.byteLength);
 
   let rsaPublicKey;
   try {
+    dbg('10. Tentando importKey (spki) da chave RSA publica...');
     rsaPublicKey = await importTempRsaPublicKey(publicKey);
-    console.log('[importKey] OK');
+    dbg('11. importKey OK');
   } catch (e) {
-    console.log('[importKey] FALHOU:', e.name, e.message);
+    dbg('11. importKey FALHOU', { nome: e.name, mensagem: e.message });
     throw new Error('Falha ao importar a chave RSA: ' + e.name + ' — ' + e.message);
   }
 
   let encryptedAesKey;
   try {
+    dbg('12. Tentando crypto.subtle.encrypt (RSA-OAEP) da chave AES...');
     encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
-    console.log('[encrypt RSA-OAEP] OK');
+    dbg('13. RSA-OAEP encrypt OK, bytes=' + encryptedAesKey.byteLength);
   } catch (e) {
-    console.log('[encrypt RSA-OAEP] FALHOU:', e.name, e.message);
+    dbg('13. RSA-OAEP encrypt FALHOU', { nome: e.name, mensagem: e.message });
     throw new Error('Falha ao cifrar com RSA: ' + e.name + ' — ' + e.message);
   }
 
+  dbg('14. Montando pacote e enviando para /myhub/documento/upload');
   const uploadRes = await fetch('/myhub/documento/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -345,11 +362,14 @@ async function encryptAndUploadFile(file, funcionarioId) {
       ciphertext: bufferToBase64(ciphertext),
     }),
   });
+  dbg('15. Resposta do /upload recebida. status', uploadRes.status);
 
   if (!uploadRes.ok) {
     const data = await uploadRes.json().catch(() => ({}));
+    dbg('16. Upload retornou erro', data);
     throw new Error(data.error || ('Falha ao enviar "' + file.name + '".'));
   }
+  dbg('16. Upload concluido com sucesso');
 }
 
 form.addEventListener('submit', async (e) => {
@@ -371,6 +391,8 @@ form.addEventListener('submit', async (e) => {
 
   msg.className = 'msg';
   msg.textContent = '';
+  debugLog.value = '';
+  debugLog.style.display = 'none';
   submitBtn.disabled = true;
   processingText.textContent = 'Enviando dados...';
   processingOverlay.classList.add('active');
@@ -398,6 +420,7 @@ form.addEventListener('submit', async (e) => {
     processingOverlay.classList.remove('active');
     msg.className = 'msg error';
     msg.textContent = err.message || 'Erro de conexão.';
+    dbg('ERRO CAPTURADO NO FORM', { nome: err.name, mensagem: err.message, stack: err.stack });
     submitBtn.disabled = false;
   }
 });
