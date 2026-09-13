@@ -1,0 +1,235 @@
+// myhub.js — Hub interno (RHs). Servido em GET /myhub.js, só pra usuários com permission "authentic".
+function renderMyHub(user) {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHs — Auron</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg: #0a0a0c;
+  --bg-alt: #111114;
+  --gold: #c9a24b;
+  --gold-dim: #8a7038;
+  --text: #e8e6e0;
+  --text-dim: #8a8a90;
+  --line: #2a2a2f;
+  --red: #b23b3b;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Archivo',sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+header{
+  height:64px;flex:none;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;border-bottom:1px solid var(--line);
+}
+.hub-mark{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.06em}
+.hub-mark span{color:var(--gold)}
+.hub-back{font-size:13px;color:var(--text-dim);text-decoration:none;transition:color .2s ease}
+.hub-back:hover{color:var(--gold)}
+
+.hub-body{flex:1;display:flex;min-height:0}
+
+.sidebar{
+  width:230px;flex:none;border-right:1px solid var(--line);
+  padding:18px 10px;display:flex;flex-direction:column;gap:2px;
+}
+.sidebar-item{
+  background:none;border:none;text-align:left;color:var(--text);
+  font-family:'Archivo',sans-serif;font-size:14px;padding:12px 14px;
+  border-radius:4px;cursor:pointer;transition:background .2s ease, color .2s ease, transform .12s ease;
+}
+.sidebar-item:hover{background:var(--line);color:var(--gold)}
+.sidebar-item:active{transform:scale(.97)}
+.sidebar-item.active{background:var(--bg-alt);color:var(--gold);border-left:2px solid var(--gold)}
+
+.main{flex:1;overflow-y:auto;padding:36px 40px}
+.empty-state{
+  height:100%;display:flex;align-items:center;justify-content:center;
+  color:var(--text-dim);font-size:13px;letter-spacing:.02em;
+}
+
+.panel{display:none;max-width:640px}
+.panel.visible{display:block}
+.panel h2{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.03em;margin-bottom:26px}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.full{grid-column:1 / -1}
+.field label{font-size:12px;color:var(--text-dim);letter-spacing:.04em}
+.field input{
+  padding:12px 14px;border-radius:2px;border:1px solid var(--line);
+  background:var(--bg-alt);color:var(--text);font-size:14px;
+  font-family:'Archivo',sans-serif;transition:border-color .2s ease;
+}
+.field input:focus{outline:none;border-color:var(--gold-dim)}
+
+.btn{
+  padding:14px 26px;border:none;border-radius:2px;
+  font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:transform .2s ease, opacity .2s ease, background .2s ease;
+  margin-top:22px;
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-primary{background:var(--gold);color:var(--bg)}
+.btn-primary:hover:not(:disabled){background:#d8b25c}
+
+.msg{font-size:13px;margin-top:14px;min-height:16px}
+.msg.error{color:var(--red)}
+.msg.success{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hub-mark">RH<span>s</span></div>
+  <a href="/" class="hub-back">&larr; Voltar</a>
+</header>
+
+<div class="hub-body">
+  <div class="sidebar">
+    <button class="sidebar-item" id="navAdmitir">Admitir</button>
+  </div>
+
+  <div class="main">
+    <div class="empty-state" id="emptyState">Selecione uma opção ao lado.</div>
+
+    <div class="panel" id="panelAdmitir">
+      <h2>Admitir funcionário</h2>
+      <form id="formAdmitir">
+        <div class="form-grid">
+          <div class="field full">
+            <label for="f-nome">Nome</label>
+            <input type="text" id="f-nome" required>
+          </div>
+          <div class="field">
+            <label for="f-idade">Idade</label>
+            <input type="number" id="f-idade" min="14" max="120" required>
+          </div>
+          <div class="field">
+            <label for="f-data">Data</label>
+            <input type="date" id="f-data" required>
+          </div>
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input type="email" id="f-email" required>
+          </div>
+          <div class="field">
+            <label for="f-tel">Tel</label>
+            <input type="tel" id="f-tel" required>
+          </div>
+          <div class="field full">
+            <label for="f-endereco">Endereço</label>
+            <input type="text" id="f-endereco" required>
+          </div>
+          <div class="field">
+            <label for="f-cpf">CPF</label>
+            <input type="text" id="f-cpf" required>
+          </div>
+          <div class="field">
+            <label for="f-rg">RG</label>
+            <input type="text" id="f-rg" required>
+          </div>
+          <div class="field">
+            <label for="f-cargo">Cargo</label>
+            <input type="text" id="f-cargo" required>
+          </div>
+          <div class="field">
+            <label for="f-funcoes">Funções</label>
+            <input type="text" id="f-funcoes" required>
+          </div>
+          <div class="field full">
+            <label for="f-cnpj">CNPJ</label>
+            <input type="text" id="f-cnpj" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">Solicitar Admissão</button>
+        <div class="msg" id="msg"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const navAdmitir = document.getElementById('navAdmitir');
+const emptyState = document.getElementById('emptyState');
+const panelAdmitir = document.getElementById('panelAdmitir');
+const dataInput = document.getElementById('f-data');
+
+dataInput.value = new Date().toISOString().slice(0, 10);
+
+navAdmitir.addEventListener('click', () => {
+  navAdmitir.classList.add('active');
+  emptyState.style.display = 'none';
+  panelAdmitir.classList.add('visible');
+});
+
+const form = document.getElementById('formAdmitir');
+const submitBtn = document.getElementById('submitBtn');
+const msg = document.getElementById('msg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    nome: document.getElementById('f-nome').value.trim(),
+    idade: document.getElementById('f-idade').value,
+    data: document.getElementById('f-data').value,
+    email: document.getElementById('f-email').value.trim(),
+    tel: document.getElementById('f-tel').value.trim(),
+    endereco: document.getElementById('f-endereco').value.trim(),
+    cpf: document.getElementById('f-cpf').value.trim(),
+    rg: document.getElementById('f-rg').value.trim(),
+    cargo: document.getElementById('f-cargo').value.trim(),
+    funcoes: document.getElementById('f-funcoes').value.trim(),
+    cnpj: document.getElementById('f-cnpj').value.trim(),
+  };
+
+  msg.className = 'msg';
+  msg.textContent = 'Enviando...';
+  submitBtn.disabled = true;
+
+  try {
+    const r = await fetch('/myhub/admitir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      msg.className = 'msg error';
+      msg.textContent = data.error || 'Erro ao enviar.';
+      submitBtn.disabled = false;
+      return;
+    }
+    msg.className = 'msg success';
+    msg.textContent = 'Solicitação enviada! Recarregando...';
+    window.location.reload();
+  } catch (err) {
+    msg.className = 'msg error';
+    msg.textContent = 'Erro de conexão.';
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>`;
+}
+
+module.exports = { renderMyHub };

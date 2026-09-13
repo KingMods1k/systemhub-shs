@@ -52,6 +52,43 @@ app.get('/myhub.js', requireAuth, (req, res) => {
   }
 });
 
+// POST /myhub/admitir — cria solicitação de admissão na collection "RHs".
+// Mesma regra da tela: token valido + permission === 'authentic'.
+app.post('/myhub/admitir', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { nome, idade, data, email, tel, endereco, cpf, rg, cargo, funcoes, cnpj } = req.body || {};
+  if (!nome || !idade || !data || !email || !tel || !endereco || !cpf || !rg || !cargo || !funcoes || !cnpj) {
+    return res.status(400).json({ error: 'Preencha todos os campos.' });
+  }
+
+  try {
+    const { connectRHs } = require('./db');
+    const rhs = await connectRHs();
+    await rhs.insertOne({
+      nome,
+      idade,
+      data,
+      email,
+      tel,
+      endereco,
+      cpf,
+      rg,
+      cargo,
+      funcoes,
+      cnpj,
+      solicitado_por: req.user.email,
+      created_at: new Date(),
+    });
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao registrar admissao:', err);
+    return res.status(500).json({ error: 'Erro interno ao registrar admissao.' });
+  }
+});
+
 // Formata o nome do usuário pra exibir na barra superior:
 // - 1 palavra: mostra inteira
 // - 2 palavras: primeiro nome + sobrenome (abreviado pra "X." se tiver mais de 3 letras)
