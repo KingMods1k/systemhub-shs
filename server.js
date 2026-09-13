@@ -146,6 +146,51 @@ nav{
 .nav-links a{color:var(--text);text-decoration:none;opacity:.8;transition:opacity .25s}
 .nav-links a:hover{opacity:1}
 .nav-user{font-family:'Archivo';font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--gold)}
+.nav-user-wrap{position:relative;display:flex;align-items:center;gap:10px}
+.nav-dots{
+  background:none;border:1px solid var(--line);color:var(--text);
+  width:28px;height:28px;border-radius:50%;cursor:pointer;
+  font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:border-color .2s ease, color .2s ease;
+}
+.nav-dots:hover{border-color:var(--gold);color:var(--gold)}
+.nav-dropdown{
+  position:absolute;top:calc(100% + 12px);right:0;min-width:190px;
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;
+  padding:6px;display:none;flex-direction:column;gap:2px;
+  box-shadow:0 12px 30px rgba(0,0,0,.5);z-index:200;
+}
+.nav-dropdown.open{display:flex}
+.nav-dropdown-item{
+  background:none;border:none;text-align:left;color:var(--text);
+  font-family:'Archivo';font-size:13px;padding:10px 12px;border-radius:4px;
+  cursor:pointer;transition:background .2s ease, color .2s ease;
+}
+.nav-dropdown-item:hover{background:var(--line);color:var(--gold)}
+
+.support-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);
+  display:none;align-items:center;justify-content:center;z-index:300;
+}
+.support-overlay.open{display:flex}
+.support-dialog{
+  position:relative;background:var(--bg);border:1px solid var(--line);
+  border-radius:8px;padding:34px 30px;width:min(360px,86vw);
+  text-align:center;
+}
+.support-dialog h3{font-family:'Bebas Neue';font-size:24px;letter-spacing:.04em;margin-bottom:22px}
+.support-close{
+  position:absolute;top:12px;right:14px;background:none;border:none;
+  color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;
+}
+.support-close:hover{color:var(--gold)}
+.support-row{display:flex;align-items:center;justify-content:center;gap:14px}
+.btn-whatsapp{
+  display:inline-flex;align-items:center;gap:8px;background:#25D366;color:#0a0a0c;
+  font-family:'Archivo';font-weight:700;font-size:14px;padding:12px 22px;
+  border-radius:4px;text-decoration:none;transition:transform .2s ease;
+}
+.btn-whatsapp:hover{transform:translateY(-2px)}
 @media (max-width:720px){.nav-links{display:none}}
 
 /* ---------- hero ---------- */
@@ -338,9 +383,31 @@ footer{
       <a href="#carreiras">Carreiras</a>
       <a href="#investir">Investir</a>
     </div>
-    <div class="nav-user">${displayName}</div>
+    <div class="nav-user-wrap">
+      <div class="nav-user">${displayName}</div>
+      <button class="nav-dots" id="navDotsBtn" aria-haspopup="true" aria-expanded="false" aria-label="Menu do usuário">⋯</button>
+      <div class="nav-dropdown" id="navDropdown">
+        ${user.permission === 'authentic' ? '<button class="nav-dropdown-item" id="btnManageProfile">Gerenciar Perfil</button>' : ''}
+        <button class="nav-dropdown-item" id="btnSupport">Suporte</button>
+        <button class="nav-dropdown-item" id="btnLogout">Sair</button>
+      </div>
+    </div>
   </div>
 </nav>
+
+<div class="support-overlay" id="supportOverlay">
+  <div class="support-dialog">
+    <button class="support-close" id="supportClose" aria-label="Fechar">&times;</button>
+    <h3>Suporte</h3>
+    <div class="support-row">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="16" fill="#25D366"/>
+        <path d="M16 8a8 8 0 0 0-6.9 12.03L8 24l4.1-1.07A8 8 0 1 0 16 8Zm0 1.6a6.4 6.4 0 0 1 5.16 10.2l-.24.33.5 1.83-1.87-.49-.33.2A6.4 6.4 0 1 1 16 9.6Zm-2.75 3.15c-.15 0-.4.06-.6.3-.21.24-.8.78-.8 1.9s.82 2.2.93 2.35c.12.16 1.6 2.55 3.95 3.47 1.95.77 2.35.62 2.77.58.43-.04 1.38-.56 1.58-1.1.2-.55.2-1.02.14-1.11-.06-.1-.21-.16-.44-.28-.23-.11-1.38-.68-1.6-.76-.21-.08-.37-.11-.53.11-.16.24-.6.76-.74.91-.14.16-.27.18-.5.06-.23-.11-.97-.36-1.85-1.14-.68-.61-1.15-1.36-1.28-1.6-.14-.23-.02-.36.1-.48.1-.1.23-.27.34-.4.11-.14.15-.24.23-.4.08-.16.04-.3-.02-.42-.06-.11-.53-1.28-.73-1.75-.19-.46-.39-.4-.53-.4Z" fill="#0a0a0c"/>
+      </svg>
+      <a href="https://wa.me/14991406778?" target="_blank" rel="noopener noreferrer" class="btn-whatsapp">WhatsApp</a>
+    </div>
+  </div>
+</div>
 
 <header class="hero">
   <div class="hero-bg"></div>
@@ -553,6 +620,59 @@ const io = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); });
 },{threshold:.15});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+
+<script>
+// --- Menu de usuário (três pontinhos) ---
+const navDotsBtn = document.getElementById('navDotsBtn');
+const navDropdown = document.getElementById('navDropdown');
+
+navDotsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = navDropdown.classList.toggle('open');
+  navDotsBtn.setAttribute('aria-expanded', String(isOpen));
+});
+
+document.addEventListener('click', (e) => {
+  if (!navDropdown.contains(e.target) && e.target !== navDotsBtn) {
+    navDropdown.classList.remove('open');
+    navDotsBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+// --- Dialog de suporte ---
+const supportOverlay = document.getElementById('supportOverlay');
+const btnSupport = document.getElementById('btnSupport');
+const supportClose = document.getElementById('supportClose');
+
+btnSupport.addEventListener('click', () => {
+  navDropdown.classList.remove('open');
+  supportOverlay.classList.add('open');
+});
+supportClose.addEventListener('click', () => supportOverlay.classList.remove('open'));
+supportOverlay.addEventListener('click', (e) => {
+  if (e.target === supportOverlay) supportOverlay.classList.remove('open');
+});
+
+// --- Gerenciar perfil (sem ação definida ainda) ---
+const btnManageProfile = document.getElementById('btnManageProfile');
+if (btnManageProfile) {
+  btnManageProfile.addEventListener('click', () => {
+    navDropdown.classList.remove('open');
+  });
+}
+
+// --- Sair: apaga o token/cookie no servidor e volta pra tela de login ---
+const btnLogout = document.getElementById('btnLogout');
+btnLogout.addEventListener('click', async () => {
+  navDropdown.classList.remove('open');
+  try {
+    await fetch('/auth/logout', { method: 'POST' });
+  } catch (err) {
+    console.error('Erro ao sair:', err);
+  }
+  window.location.href = '/';
+});
 </script>
 
 </body>
