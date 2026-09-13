@@ -293,10 +293,15 @@ async function encryptAndUploadFile(file, funcionarioId) {
   if (!tempRes.ok) throw new Error('Nao foi possivel obter chave temporaria do servidor.');
   const { keyId, publicKey } = await tempRes.json();
 
-  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const fileBuffer = await file.arrayBuffer();
-  const encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
+  let aesKey, iv, fileBuffer, encryptedCombined;
+  try {
+    aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+    iv = crypto.getRandomValues(new Uint8Array(12));
+    fileBuffer = await file.arrayBuffer();
+    encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
+  } catch (e) {
+    throw new Error('Falha ao cifrar com AES: ' + e.name + ' — ' + e.message);
+  }
 
   // O Web Crypto devolve ciphertext + tag colados (tag = ultimos 16 bytes) —
   // o server espera os dois separados, então separamos aqui antes de enviar.
@@ -304,27 +309,37 @@ async function encryptAndUploadFile(file, funcionarioId) {
   const authTag = combined.slice(combined.length - 16);
   const ciphertext = combined.slice(0, combined.length - 16);
 
-  const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
-  const rsaPublicKey = await importTempRsaPublicKey(publicKey);
-  const encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
+  let rawAesKey, rsaPublicKey, encryptedAesKey;
+  try {
+    rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+    rsaPublicKey = await importTempRsaPublicKey(publicKey);
+    encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
+  } catch (e) {
+    throw new Error('Falha ao cifrar a chave AES com RSA: ' + e.name + ' — ' + e.message);
+  }
 
-  const uploadRes = await fetch('/myhub/documento/upload', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      keyId,
-      funcionarioId,
-      mimetype: file.type || 'application/pdf',
-      encryptedAesKey: bufferToBase64(encryptedAesKey),
-      iv: bufferToBase64(iv),
-      authTag: bufferToBase64(authTag),
-      ciphertext: bufferToBase64(ciphertext),
-    }),
-  });
+  let uploadRes;
+  try {
+    uploadRes = await fetch('/myhub/documento/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyId,
+        funcionarioId,
+        mimetype: file.type || 'application/pdf',
+        encryptedAesKey: bufferToBase64(encryptedAesKey),
+        iv: bufferToBase64(iv),
+        authTag: bufferToBase64(authTag),
+        ciphertext: bufferToBase64(ciphertext),
+      }),
+    });
+  } catch (e) {
+    throw new Error('Falha de rede ao enviar o arquivo: ' + e.name + ' — ' + e.message);
+  }
 
   if (!uploadRes.ok) {
     const data = await uploadRes.json().catch(() => ({}));
-    throw new Error(data.error || ('Falha ao enviar "' + file.name + '".'));
+    throw new Error(data.error || ('Falha ao enviar "' + file.name + '" (status ' + uploadRes.status + ').'));
   }
 }
 
