@@ -20,7 +20,7 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
 
 const { router: authRouter, requireAuth, checkAuth } = require('./auth');
