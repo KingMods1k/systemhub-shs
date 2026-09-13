@@ -25,6 +25,7 @@ app.use(cookieParser());
 
 const { router: authRouter, requireAuth, checkAuth } = require('./auth');
 const shsRouter = require('./shs');
+const documentCrypto = require('./crypto');
 const { renderLoginPage } = require('./login');
 
 app.use('/auth', authRouter);
@@ -86,6 +87,91 @@ app.post('/myhub/admitir', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Erro ao registrar admissao:', err);
     return res.status(500).json({ error: 'Erro interno ao registrar admissao.' });
+  }
+});
+
+// GET /myhub/documento/rsa-temp — gera uma chave RSA temporaria (uso unico, 5min de validade)
+// pro app cifrar o pacote com. A chave privada correspondente nunca sai da RAM do server.
+app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+  const { keyId, publicKey } = documentCrypto.generateTempKeyPair();
+  return res.json({ keyId, publicKey });
+});
+
+// POST /myhub/documento/upload — recebe o pacote cifrado do funcionario, abre com a chave
+// RSA temporaria, cifra de novo com a chave PERMANENTE do servidor (.env), assina com a
+// chave privada permanente e guarda tudo cifrado dentro do registro em "RHs".
+//
+// Corpo esperado (tudo em Base64, exceto keyId/funcionarioId/mimetype):
+// { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext }
+app.post('/myhub/documento/upload', requireAuth, express.json({ limit: '20mb' }), async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext } = req.body || {};
+  if (!keyId || !funcionarioId || !mimetype || !encryptedAesKey || !iv || !authTag || !ciphertext) {
+    return res.status(400).json({ error: 'Pacote incompleto.' });
+  }
+
+  const tempPrivateKey = documentCrypto.consumeTempPrivateKey(keyId);
+  if (!tempPrivateKey) {
+    return res.status(400).json({ error: 'Chave temporaria invalida ou expirada. Peca uma nova e tente de novo.' });
+  }
+
+  try {
+    // 1) Abre o pacote que veio do funcionario (RSA temporaria -> chave AES -> documento)
+    const aesKey = documentCrypto.rsaDecrypt(Buffer.from(encryptedAesKey, 'base64'), tempPrivateKey);
+    const plaintext = documentCrypto.aesDecrypt(
+      Buffer.from(ciphertext, 'base64'),
+      aesKey,
+      Buffer.from(iv, 'base64'),
+      Buffer.from(authTag, 'base64')
+    );
+
+    // 2) Cifra de novo com uma chave AES nova, envelopada com a RSA publica PERMANENTE do server
+    const newAesKey = documentCrypto.generateAesKey();
+    const { ciphertext: newCiphertext, iv: newIv, authTag: newAuthTag } = documentCrypto.aesEncrypt(plaintext, newAesKey);
+    const encryptedAesKeyServer = documentCrypto.rsaEncrypt(newAesKey, documentCrypto.getServerPublicKey());
+
+    // 3) Assina o conteudo original com a RSA privada PERMANENTE do server
+    const signature = documentCrypto.sign(plaintext, documentCrypto.getServerPrivateKey());
+
+    // 4) Empilha o documento cifrado dentro do registro do funcionario, em "RHs".
+    // $push cria o array "documentos" sozinho se ainda nao existir, e cada novo
+    // arquivo entra por baixo dos anteriores (mesma ordem de envio).
+    const { ObjectId } = require('mongodb');
+    const { connectRHs } = require('./db');
+    const rhs = await connectRHs();
+    const result = await rhs.updateOne(
+      { _id: new ObjectId(funcionarioId) },
+      {
+        $push: {
+          documentos: {
+            _id: new ObjectId(),
+            mimetype,
+            arquivo_cifrado: newCiphertext,
+            chave_cifrada: encryptedAesKeyServer,
+            iv: newIv,
+            auth_tag: newAuthTag,
+            assinatura: signature,
+            enviado_por: req.user.email,
+            created_at: new Date(),
+          },
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Funcionario nao encontrado.' });
+    }
+
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao processar documento cifrado:', err);
+    return res.status(400).json({ error: 'Nao foi possivel processar o pacote cifrado.' });
   }
 });
 
