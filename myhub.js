@@ -79,6 +79,32 @@ header{
 }
 .field input:focus{outline:none;border-color:var(--gold-dim)}
 
+@media (max-width:720px){
+  header{height:52px;padding:0 16px}
+  .hub-mark{font-size:19px}
+  .hub-back{font-size:12px}
+
+  .hub-body{flex-direction:column}
+
+  .sidebar{
+    width:100%;flex-direction:row;overflow-x:auto;
+    border-right:none;border-bottom:1px solid var(--line);
+    padding:8px 10px;gap:6px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  }
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar-item{
+    flex:none;font-size:12px;padding:8px 12px;white-space:nowrap;
+  }
+  .sidebar-item.active{border-left:none;border-bottom:2px solid var(--gold)}
+
+  .main{padding:20px 16px}
+  .panel h2{font-size:21px;margin-bottom:18px}
+  .form-grid{grid-template-columns:1fr;gap:12px}
+  .field input{padding:10px 12px;font-size:13px}
+  .btn{padding:12px 20px;font-size:13px;width:100%}
+}
+
 .btn{
   padding:14px 26px;border:none;border-radius:2px;
   font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;
