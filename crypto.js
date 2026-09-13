@@ -120,7 +120,16 @@ function generateTempKeyPair() {
   });
   const keyId = crypto.randomUUID();
   tempKeys.set(keyId, { privateKey, expiresAt: Date.now() + TEMP_KEY_TTL_MS });
-  return { keyId, publicKey };
+
+  // Extrai so o conteudo Base64 do PEM (sem cabecalho/rodape/quebras de linha),
+  // pra mandar pro navegador um valor "cru" que ele usa direto, sem precisar
+  // limpar nada do lado dele.
+  const publicKeyBase64 = publicKey
+    .replace(/-----BEGIN [^-]+-----/, '')
+    .replace(/-----END [^-]+-----/, '')
+    .replace(/\s+/g, '');
+
+  return { keyId, publicKey: publicKeyBase64 };
 }
 
 // Consome (usa e apaga) uma chave temporária. Retorna null se não existir ou tiver expirado.
