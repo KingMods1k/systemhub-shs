@@ -312,10 +312,18 @@ async function encryptAndUploadFile(file, funcionarioId) {
   let rawAesKey, rsaPublicKey, encryptedAesKey;
   try {
     rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+  } catch (e) {
+    throw new Error('Falha ao exportar chave AES: ' + e.name + ' — ' + e.message);
+  }
+  try {
     rsaPublicKey = await importTempRsaPublicKey(publicKey);
+  } catch (e) {
+    throw new Error('Falha ao IMPORTAR a chave RSA publica: ' + e.name + ' — ' + e.message + ' | PEM recebido (' + publicKey.length + ' chars): ' + JSON.stringify(publicKey.slice(0, 60)));
+  }
+  try {
     encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
   } catch (e) {
-    throw new Error('Falha ao cifrar a chave AES com RSA: ' + e.name + ' — ' + e.message);
+    throw new Error('Falha ao CIFRAR com a chave RSA importada: ' + e.name + ' — ' + e.message + ' | rawAesKey bytes: ' + rawAesKey.byteLength);
   }
 
   let uploadRes;
