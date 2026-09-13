@@ -248,7 +248,7 @@ function dbg(label, data) {
   debugLog.style.display = 'block';
   const line = '[' + new Date().toISOString().slice(11, 19) + '] ' + label +
     (data !== undefined ? ': ' + (typeof data === 'string' ? data : JSON.stringify(data)) : '');
-  debugLog.value += line + '\n\n';
+  debugLog.value += line + '\\n\\n';
   debugLog.scrollTop = debugLog.scrollHeight;
 }
 
