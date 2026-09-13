@@ -68,7 +68,7 @@ app.post('/myhub/admitir', requireAuth, async (req, res) => {
   try {
     const { connectRHs } = require('./db');
     const rhs = await connectRHs();
-    await rhs.insertOne({
+    const result = await rhs.insertOne({
       nome,
       idade,
       data,
@@ -83,7 +83,7 @@ app.post('/myhub/admitir', requireAuth, async (req, res) => {
       solicitado_por: req.user.email,
       created_at: new Date(),
     });
-    return res.status(201).json({ ok: true });
+    return res.status(201).json({ ok: true, id: String(result.insertedId) });
   } catch (err) {
     console.error('Erro ao registrar admissao:', err);
     return res.status(500).json({ error: 'Erro interno ao registrar admissao.' });

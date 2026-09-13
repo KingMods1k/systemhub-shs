@@ -119,6 +119,23 @@ header{
 .msg{font-size:13px;margin-top:14px;min-height:16px}
 .msg.error{color:var(--red)}
 .msg.success{color:var(--gold)}
+
+.file-hint{font-size:12px;color:var(--text-dim);margin-top:2px}
+.file-hint.error{color:var(--red)}
+
+.processing-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.78);
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;z-index:500;
+}
+.processing-overlay.active{display:flex}
+.spinner{
+  width:52px;height:52px;border-radius:50%;
+  border:4px solid rgba(255,255,255,.12);border-top-color:var(--gold);
+  animation:hub-spin .8s linear infinite;
+}
+@keyframes hub-spin{to{transform:rotate(360deg)}}
+.processing-text{font-size:13px;color:var(--text-dim);letter-spacing:.03em}
 </style>
 </head>
 <body>
@@ -184,6 +201,11 @@ header{
             <label for="f-cnpj">CNPJ</label>
             <input type="text" id="f-cnpj" required>
           </div>
+          <div class="field full">
+            <label for="f-documentos">Documentos (máx. 6, PDF)</label>
+            <input type="file" id="f-documentos" accept="application/pdf" multiple>
+            <div class="file-hint" id="fileHint"></div>
+          </div>
         </div>
 
         <button type="submit" class="btn btn-primary" id="submitBtn">Solicitar Admissão</button>
@@ -191,6 +213,11 @@ header{
       </form>
     </div>
   </div>
+</div>
+
+<div class="processing-overlay" id="processingOverlay">
+  <div class="spinner"></div>
+  <div class="processing-text" id="processingText">Processando...</div>
 </div>
 
 <script>
@@ -210,6 +237,96 @@ navAdmitir.addEventListener('click', () => {
 const form = document.getElementById('formAdmitir');
 const submitBtn = document.getElementById('submitBtn');
 const msg = document.getElementById('msg');
+const fileInput = document.getElementById('f-documentos');
+const fileHint = document.getElementById('fileHint');
+const processingOverlay = document.getElementById('processingOverlay');
+const processingText = document.getElementById('processingText');
+
+const MAX_FILES = 6;
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > MAX_FILES) {
+    fileHint.textContent = 'Máximo de ' + MAX_FILES + ' arquivos — selecione novamente.';
+    fileHint.className = 'file-hint error';
+    fileInput.value = '';
+  } else if (fileInput.files.length > 0) {
+    fileHint.textContent = fileInput.files.length + ' arquivo(s) selecionado(s).';
+    fileHint.className = 'file-hint';
+  } else {
+    fileHint.textContent = '';
+    fileHint.className = 'file-hint';
+  }
+});
+
+// --- Helpers de criptografia (Web Crypto API, roda no navegador) ---
+function pemToArrayBuffer(pem) {
+  const b64 = pem
+    .replace(/-----BEGIN [^-]+-----/, '')
+    .replace(/-----END [^-]+-----/, '')
+    .replace(/\s+/g, '');
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function importTempRsaPublicKey(pem) {
+  return crypto.subtle.importKey(
+    'spki',
+    pemToArrayBuffer(pem),
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['encrypt']
+  );
+}
+
+// Cifra 1 arquivo (AES-256-GCM + envelope RSA-OAEP com chave temporaria) e envia.
+async function encryptAndUploadFile(file, funcionarioId) {
+  const tempRes = await fetch('/myhub/documento/rsa-temp');
+  if (!tempRes.ok) throw new Error('Nao foi possivel obter chave temporaria do servidor.');
+  const { keyId, publicKey } = await tempRes.json();
+
+  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const fileBuffer = await file.arrayBuffer();
+  const encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileBuffer);
+
+  // O Web Crypto devolve ciphertext + tag colados (tag = ultimos 16 bytes) —
+  // o server espera os dois separados, então separamos aqui antes de enviar.
+  const combined = new Uint8Array(encryptedCombined);
+  const authTag = combined.slice(combined.length - 16);
+  const ciphertext = combined.slice(0, combined.length - 16);
+
+  const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+  const rsaPublicKey = await importTempRsaPublicKey(publicKey);
+  const encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaPublicKey, rawAesKey);
+
+  const uploadRes = await fetch('/myhub/documento/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      keyId,
+      funcionarioId,
+      mimetype: file.type || 'application/pdf',
+      encryptedAesKey: bufferToBase64(encryptedAesKey),
+      iv: bufferToBase64(iv),
+      authTag: bufferToBase64(authTag),
+      ciphertext: bufferToBase64(ciphertext),
+    }),
+  });
+
+  if (!uploadRes.ok) {
+    const data = await uploadRes.json().catch(() => ({}));
+    throw new Error(data.error || ('Falha ao enviar "' + file.name + '".'));
+  }
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -226,10 +343,13 @@ form.addEventListener('submit', async (e) => {
     funcoes: document.getElementById('f-funcoes').value.trim(),
     cnpj: document.getElementById('f-cnpj').value.trim(),
   };
+  const files = Array.from(fileInput.files || []);
 
   msg.className = 'msg';
-  msg.textContent = 'Enviando...';
+  msg.textContent = '';
   submitBtn.disabled = true;
+  processingText.textContent = 'Enviando dados...';
+  processingOverlay.classList.add('active');
 
   try {
     const r = await fetch('/myhub/admitir', {
@@ -239,17 +359,21 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await r.json();
     if (!r.ok) {
-      msg.className = 'msg error';
-      msg.textContent = data.error || 'Erro ao enviar.';
-      submitBtn.disabled = false;
-      return;
+      throw new Error(data.error || 'Erro ao enviar.');
     }
-    msg.className = 'msg success';
-    msg.textContent = 'Solicitação enviada! Recarregando...';
+
+    // Envia os documentos um de cada vez, na ordem em que foram selecionados
+    for (let i = 0; i < files.length; i++) {
+      processingText.textContent = 'Enviando documento ' + (i + 1) + ' de ' + files.length + '...';
+      await encryptAndUploadFile(files[i], data.id);
+    }
+
+    processingText.textContent = 'Concluído! Recarregando...';
     window.location.reload();
   } catch (err) {
+    processingOverlay.classList.remove('active');
     msg.className = 'msg error';
-    msg.textContent = 'Erro de conexão.';
+    msg.textContent = err.message || 'Erro de conexão.';
     submitBtn.disabled = false;
   }
 });
