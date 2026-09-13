@@ -93,10 +93,13 @@ app.post('/myhub/admitir', requireAuth, async (req, res) => {
 // GET /myhub/documento/rsa-temp — gera uma chave RSA temporaria (uso unico, 5min de validade)
 // pro app cifrar o pacote com. A chave privada correspondente nunca sai da RAM do server.
 app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
+  console.log('[rsa-temp] rota alcancada. user:', req.user && req.user.email, 'permission:', req.user && req.user.permission);
   if (req.user.permission !== 'authentic') {
+    console.log('[rsa-temp] bloqueado: permission =', req.user.permission);
     return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
   }
   const { keyId, publicKey } = documentCrypto.generateTempKeyPair();
+  console.log('[rsa-temp] chave gerada, keyId:', keyId);
   return res.json({ keyId, publicKey });
 });
 
@@ -107,17 +110,25 @@ app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
 // Corpo esperado (tudo em Base64, exceto keyId/funcionarioId/mimetype):
 // { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext }
 app.post('/myhub/documento/upload', requireAuth, express.json({ limit: '20mb' }), async (req, res) => {
+  console.log('[upload] rota alcancada. body keys:', Object.keys(req.body || {}));
+
   if (req.user.permission !== 'authentic') {
+    console.log('[upload] bloqueado: permission =', req.user.permission);
     return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
   }
 
   const { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext } = req.body || {};
   if (!keyId || !funcionarioId || !mimetype || !encryptedAesKey || !iv || !authTag || !ciphertext) {
+    console.log('[upload] pacote incompleto. presentes:', {
+      keyId: !!keyId, funcionarioId: !!funcionarioId, mimetype: !!mimetype,
+      encryptedAesKey: !!encryptedAesKey, iv: !!iv, authTag: !!authTag, ciphertext: !!ciphertext,
+    });
     return res.status(400).json({ error: 'Pacote incompleto.' });
   }
 
   const tempPrivateKey = documentCrypto.consumeTempPrivateKey(keyId);
   if (!tempPrivateKey) {
+    console.log('[upload] chave temporaria invalida/expirada para keyId:', keyId);
     return res.status(400).json({ error: 'Chave temporaria invalida ou expirada. Peca uma nova e tente de novo.' });
   }
 
