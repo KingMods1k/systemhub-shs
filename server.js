@@ -589,8 +589,8 @@ footer{
   </h1>
   <p class="hero-sub">Projetamos, fabricamos e entregamos veículos com a mesma régua: precisão de linha de montagem e obsessão pelo detalhe. Esta é a Auron.</p>
   <div class="hero-meta">
-    <div><strong>04</strong>modelos em linha</div>
-    <div><strong>2018</strong>ano de fundação</div>
+    <div><strong>29</strong>modelos em linha</div>
+    <div><strong>1926</strong>ano de fundação</div>
     <div><strong>03</strong>unidades operacionais</div>
   </div>
 </header>
