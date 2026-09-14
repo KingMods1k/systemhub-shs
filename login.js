@@ -180,8 +180,8 @@ form{display:flex;flex-direction:column;gap:16px}
   <h1 class="side-title">Engenharia<br>em <em>movimento.</em></h1>
   <p class="side-lede">Fábrica e concessionária próprias, do primeiro parafuso à entrega das chaves. Acesse para acompanhar a linha Auron MVIST.</p>
   <div class="side-stats">
-    <div><strong>04</strong>modelos em linha</div>
-    <div><strong>2018</strong>fundação</div>
+    <div><strong>29</strong>modelos em linha</div>
+    <div><strong>1926</strong>fundação</div>
     <div><strong>03</strong>unidades</div>
   </div>
 </div>
@@ -194,22 +194,22 @@ form{display:flex;flex-direction:column;gap:16px}
   <form id="f">
     <div class="field" id="nameField" style="display:none">
       <label for="name">Nome</label>
-      <input type="text" id="name" placeholder="Seu nome" maxlength="60">
+      <input type="text" id="name" placeholder="Nome de Úsuario" maxlength="60">
     </div>
     <div class="field">
       <label for="email">Email</label>
-      <input type="email" id="email" placeholder="seu@email.com" maxlength="150" required>
+      <input type="email" id="email" placeholder="exemplo@email.com" maxlength="150" required>
     </div>
     <div class="field">
       <label for="password">Senha</label>
-      <input type="password" id="password" placeholder="********" required minlength="8">
+      <input type="password" id="password" placeholder="minímo 8 dígitos" required minlength="8">
       <div class="hint" id="hint"></div>
     </div>
 
     <button type="submit" class="btn btn-primary" id="submitBtn">Entrar</button>
 
     <div class="msg" id="msg"></div>
-    <div class="toggle" id="toggle">Nao tem conta? Registrar</div>
+    <div class="toggle" id="toggle">Registrar</div>
   </form>
 </div>
 </div>
@@ -262,7 +262,7 @@ document.getElementById('f').onsubmit = async (e) => {
       return;
     }
     msg.className = 'msg success';
-    msg.textContent = 'Sucesso! Redirecionando...';
+    msg.textContent = 'Sucesso! Conectando...';
     window.location.reload();
   } catch (err) {
     msg.className = 'msg error';
