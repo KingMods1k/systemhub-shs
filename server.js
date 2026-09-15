@@ -31,6 +31,61 @@ const { renderLoginPage } = require('./login');
 app.use('/auth', authRouter);
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
+// GET /vagas — lista as vagas abertas para o dialog "Vagas" da landing page.
+// Publica (sem login), ja que qualquer visitante pode ver e se candidatar.
+// Na primeira chamada, se a colecao estiver vazia, popula com as vagas
+// padrao (seed) para nao precisar cadastrar na mao no Atlas.
+app.get('/vagas', async (req, res) => {
+  try {
+    const { connectVagas } = require('./db');
+    const vagas = await connectVagas();
+
+    const total = await vagas.countDocuments();
+    if (total === 0) {
+      await vagas.insertMany([
+        { titulo: 'Operador de Máquinas', area: 'Linha de montagem e engenharia', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+        { titulo: 'Engenheiro de Produção', area: 'Linha de montagem e engenharia', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+        { titulo: 'Consultor de Vendas', area: 'Vendas e relacionamento — concessionária', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+        { titulo: 'Analista de Relacionamento com Cliente', area: 'Vendas e relacionamento — concessionária', local: 'Botucatu - SP', tipo: 'Híbrido', created_at: new Date() },
+        { titulo: 'Analista de Marketing', area: 'Marca, comunicação e eventos', local: 'Botucatu - SP', tipo: 'Híbrido', created_at: new Date() },
+        { titulo: 'Produtor de Eventos', area: 'Marca, comunicação e eventos', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+        { titulo: 'Analista de Operações', area: 'Operações e expansão', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+        { titulo: 'Coordenador de Expansão', area: 'Operações e expansão', local: 'Botucatu - SP', tipo: 'Presencial', created_at: new Date() },
+      ]);
+    }
+
+    const lista = await vagas.find({}).sort({ area: 1, titulo: 1 }).toArray();
+    const formatada = lista.map((v) => ({ id: String(v._id), titulo: v.titulo, area: v.area, local: v.local, tipo: v.tipo }));
+    return res.json({ vagas: formatada });
+  } catch (err) {
+    console.error('Erro ao listar vagas:', err);
+    return res.status(500).json({ error: 'Erro interno ao carregar vagas.' });
+  }
+});
+
+// POST /vagas/inscrever — registra a escolha do candidato apos ele selecionar
+// uma vaga no dialog e clicar em "Continuar". Publica (sem login).
+app.post('/vagas/inscrever', async (req, res) => {
+  const { vagaId } = req.body || {};
+  if (!vagaId) {
+    return res.status(400).json({ error: 'Selecione uma vaga.' });
+  }
+
+  try {
+    const { ObjectId } = require('mongodb');
+    const { connectVagas } = require('./db');
+    const vagas = await connectVagas();
+    const vaga = await vagas.findOne({ _id: new ObjectId(vagaId) });
+    if (!vaga) {
+      return res.status(404).json({ error: 'Vaga nao encontrada.' });
+    }
+    return res.status(201).json({ ok: true, vaga: vaga.titulo });
+  } catch (err) {
+    console.error('Erro ao registrar inscricao:', err);
+    return res.status(500).json({ error: 'Erro interno ao registrar inscricao.' });
+  }
+});
+
 app.get('/favicon.ico', (req, res) => {
   res.sendFile(require('path').join(__dirname, 'favicon.ico'));
 });
@@ -538,6 +593,47 @@ footer{
   display:flex;justify-content:space-between;color:var(--text-dim);font-size:13px;
   flex-wrap:wrap;gap:16px;
 }
+
+/* --- Dialog de Vagas --- */
+.vagas-overlay{
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;justify-content:center;
+  padding:20px;
+}
+.vagas-overlay.open{display:flex}
+.vagas-dialog{
+  width:100%;max-width:480px;max-height:80vh;
+  background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.vagas-header{
+  padding:22px 24px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.vagas-header h3{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em;color:var(--text)}
+.vagas-close{
+  background:none;border:none;color:var(--text-dim);font-size:26px;line-height:1;
+  cursor:pointer;padding:0 4px;
+}
+.vagas-close:hover{color:var(--gold)}
+.vagas-body{padding:14px 16px;overflow-y:auto;flex:1;}
+.vagas-loading,.vagas-empty,.vagas-error{padding:20px;text-align:center;color:var(--text-dim);font-size:14px;}
+.vagas-item{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:16px 12px;border-radius:4px;cursor:pointer;
+  border:1px solid transparent;
+}
+.vagas-item:hover{background:rgba(255,255,255,.03)}
+.vagas-item.selected{border-color:var(--gold-dim);background:rgba(201,162,75,.08)}
+.vagas-item input[type=radio]{margin-top:4px;accent-color:var(--gold);flex-shrink:0}
+.vagas-item-info .titulo{font-size:15px;font-weight:600;color:var(--text)}
+.vagas-item-info .meta{font-size:12px;color:var(--text-dim);margin-top:3px}
+.vagas-footer{padding:18px 24px;border-top:1px solid var(--line)}
+.vagas-footer .btn{width:100%;text-align:center;border:none;cursor:pointer}
+.vagas-footer .btn:disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -776,10 +872,25 @@ footer{
   <h2 class="cta-title reveal reveal-delay-1">Não trabalha na Auron?<br>Então <em>entre</em> na Auron.</h2>
   <p class="section-lede reveal reveal-delay-2">Quem não veste a camisa hoje ainda tem um lugar: como cliente da primeira hora ou investidor da primeira rodada. A fábrica está de portas abertas.</p>
   <div class="cta-actions reveal reveal-delay-3">
-    <a href="#" class="btn btn-primary">Quero investir na Auron</a>
+    <a href="#" class="btn btn-primary" id="btnInscrever">Se inscrever...</a>
     <a href="#" class="btn btn-ghost">Reservar um modelo</a>
   </div>
 </section>
+
+<div class="vagas-overlay" id="vagasOverlay">
+  <div class="vagas-dialog">
+    <div class="vagas-header">
+      <h3>Vagas</h3>
+      <button type="button" class="vagas-close" id="vagasClose" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="vagas-body" id="vagasBody">
+      <div class="vagas-loading">Carregando vagas...</div>
+    </div>
+    <div class="vagas-footer">
+      <button type="button" class="btn btn-primary" id="vagasContinuar" disabled>Continuar</button>
+    </div>
+  </div>
+</div>
 
 <footer>
   <span>Auron Company Invest — Fábrica &amp; Concessionária · (14) 98101-6182</span>
@@ -851,6 +962,100 @@ btnLogout.addEventListener('click', async () => {
   }
   window.location.href = '/';
 });
+</script>
+
+<script>
+// --- Dialog de Vagas ---
+(function () {
+  const overlay = document.getElementById('vagasOverlay');
+  const body = document.getElementById('vagasBody');
+  const btnAbrir = document.getElementById('btnInscrever');
+  const btnFechar = document.getElementById('vagasClose');
+  const btnContinuar = document.getElementById('vagasContinuar');
+
+  let vagaSelecionada = null;
+  let vagasCarregadas = false;
+
+  function renderVagas(vagas) {
+    if (!vagas.length) {
+      body.innerHTML = '<div class="vagas-empty">Nenhuma vaga aberta no momento.</div>';
+      return;
+    }
+    body.innerHTML = vagas.map((v) => (
+      '<label class="vagas-item" data-id="' + v.id + '">' +
+        '<input type="radio" name="vaga" value="' + v.id + '">' +
+        '<div class="vagas-item-info">' +
+          '<div class="titulo">' + v.titulo + '</div>' +
+          '<div class="meta">' + v.area + ' · ' + v.local + ' · ' + v.tipo + '</div>' +
+        '</div>' +
+      '</label>'
+    )).join('');
+
+    body.querySelectorAll('.vagas-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        body.querySelectorAll('.vagas-item').forEach((i) => i.classList.remove('selected'));
+        item.classList.add('selected');
+        item.querySelector('input[type=radio]').checked = true;
+        vagaSelecionada = item.getAttribute('data-id');
+        btnContinuar.disabled = false;
+      });
+    });
+  }
+
+  async function carregarVagas() {
+    body.innerHTML = '<div class="vagas-loading">Carregando vagas...</div>';
+    try {
+      const r = await fetch('/vagas');
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao carregar vagas.');
+      renderVagas(data.vagas || []);
+      vagasCarregadas = true;
+    } catch (err) {
+      body.innerHTML = '<div class="vagas-error">Não foi possível carregar as vagas agora.</div>';
+    }
+  }
+
+  function abrirDialog() {
+    overlay.classList.add('open');
+    vagaSelecionada = null;
+    btnContinuar.disabled = true;
+    if (!vagasCarregadas) carregarVagas();
+  }
+
+  function fecharDialog() {
+    overlay.classList.remove('open');
+  }
+
+  btnAbrir.addEventListener('click', (e) => {
+    e.preventDefault();
+    abrirDialog();
+  });
+  btnFechar.addEventListener('click', fecharDialog);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) fecharDialog();
+  });
+
+  btnContinuar.addEventListener('click', async () => {
+    if (!vagaSelecionada) return;
+    btnContinuar.disabled = true;
+    btnContinuar.textContent = 'Enviando...';
+    try {
+      const r = await fetch('/vagas/inscrever', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vagaId: vagaSelecionada }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Erro ao continuar.');
+      btnContinuar.textContent = 'Inscrição enviada!';
+      setTimeout(fecharDialog, 1200);
+    } catch (err) {
+      btnContinuar.textContent = 'Continuar';
+      btnContinuar.disabled = false;
+      alert(err.message || 'Erro ao enviar. Tente novamente.');
+    }
+  });
+})();
 </script>
 
 </body>

@@ -54,4 +54,15 @@ async function connectRHs() {
   return rhsCollection;
 }
 
-module.exports = { connect, connectRHs };
+let vagasCollection = null;
+
+// Coleção "Vagas" — lista de vagas abertas mostrada no dialog de inscrição da landing page.
+async function connectVagas() {
+  if (vagasCollection) return vagasCollection;
+  const db = await ensureClientConnected();
+  vagasCollection = db.collection('Vagas');
+  console.log('Conectado ao MongoDB (' + DB_NAME + ') — collection Vagas');
+  return vagasCollection;
+}
+
+module.exports = { connect, connectRHs, connectVagas };
