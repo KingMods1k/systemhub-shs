@@ -27,9 +27,31 @@ const { router: authRouter, requireAuth, checkAuth } = require('./auth');
 const shsRouter = require('./shs');
 const documentCrypto = require('./crypto');
 const { renderLoginPage } = require('./login');
+const finance = require('./finance');
 
 app.use('/auth', authRouter);
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
+
+// Motor de "saída" da seção financeira da landing page — roda em memória,
+// dispara em intervalos aleatórios (10s–170s), persiste no Mongo a cada tick.
+finance.startFinanceEngine();
+
+// GET /financeiro/live — números públicos (sem login) pra seção "Auron em
+// Números" da landing page. O front consulta a cada 3s.
+app.get('/financeiro/live', async (req, res) => {
+  try {
+    const [state, usd] = await Promise.all([finance.getState(), finance.getUsdBrl()]);
+    return res.json({
+      entrada: state.entrada || 0,
+      saida: state.saida || 0,
+      saldo: state.saldo || 0,
+      usdBrl: usd,
+    });
+  } catch (err) {
+    console.error('Erro ao obter dados financeiros ao vivo:', err);
+    return res.status(500).json({ error: 'Erro interno ao carregar dados financeiros.' });
+  }
+});
 
 // --- Validação dos dados pessoais da segunda etapa (POST /vagas/finalizar) ---
 // Tudo validado de novo aqui no servidor, mesmo que o client já formate/valide,
@@ -691,6 +713,40 @@ section{padding:140px 6vw;position:relative}
   padding:26px 0;border-top:1px solid var(--line);
 }
 .stat-row:last-child{border-bottom:1px solid var(--line)}
+
+/* ---------- financeiro ao vivo ---------- */
+.fin-lede{max-width:640px;color:var(--text-dim);font-size:17px;line-height:1.7;margin-top:28px}
+.fin-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:56px;
+}
+@media (max-width:860px){.fin-grid{grid-template-columns:1fr}}
+.fin-card{
+  border:1px solid var(--line);border-radius:8px;padding:28px 26px;
+  background:var(--bg-alt);position:relative;overflow:hidden;
+}
+.fin-card::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 100% 0%, rgba(201,162,75,.06), transparent);
+}
+.fin-label{font-size:12px;letter-spacing:.1em;color:var(--text-dim);text-transform:uppercase}
+.fin-value{
+  font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,2.6vw,36px);
+  margin-top:12px;letter-spacing:.01em;
+  transition:opacity .25s ease;
+}
+.fin-value.pulse{animation:fin-pulse .5s ease}
+@keyframes fin-pulse{0%{opacity:.35}100%{opacity:1}}
+.fin-entrada .fin-value{color:#4ade80}
+.fin-saida .fin-value{color:#f87171}
+.fin-saldo .fin-value{color:var(--gold)}
+.fin-foot{margin-top:18px;font-size:12px;color:var(--text-dim)}
+.fin-foot strong{color:var(--text)}
+.fin-live-dot{
+  display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:#4ade80;margin-right:6px;
+  animation:fin-live-blink 1.8s ease-in-out infinite;
+}
+@keyframes fin-live-blink{0%,100%{opacity:1}50%{opacity:.3}}
 .stat-label{font-size:14px;color:var(--text-dim)}
 .stat-value{font-family:'Bebas Neue';font-size:42px;color:var(--gold)}
 
@@ -920,7 +976,29 @@ footer{
   </div>
 </section>
 
-<section id="linha" class="section-alt">
+<section id="numeros" class="section-alt">
+  <div class="eyebrow reveal"><span class="fin-live-dot"></span>Auron em números — ao vivo</div>
+  <h2 class="section-title reveal reveal-delay-1">Movimento real<br>de capital.</h2>
+  <p class="fin-lede reveal reveal-delay-2">Entrada, saída e liquidez da operação, atualizados continuamente conforme o negócio acontece.</p>
+
+  <div class="fin-grid reveal reveal-delay-3">
+    <div class="fin-card fin-entrada">
+      <div class="fin-label">Entrada</div>
+      <div class="fin-value" id="finEntrada">—</div>
+    </div>
+    <div class="fin-card fin-saida">
+      <div class="fin-label">Saída</div>
+      <div class="fin-value" id="finSaida">—</div>
+    </div>
+    <div class="fin-card fin-saldo">
+      <div class="fin-label">Liquidez</div>
+      <div class="fin-value" id="finSaldo">—</div>
+    </div>
+  </div>
+  <div class="fin-foot">Câmbio de referência (USD/BRL): <strong id="finUsd">—</strong></div>
+</section>
+
+<section id="linha">
   <div class="eyebrow reveal">Linha de produção</div>
   <h2 class="section-title reveal reveal-delay-1">Os modelos<br>Auron.</h2>
   <p class="section-lede reveal reveal-delay-2">Quatro modelos abrem a linha MVIST, da mobilidade elétrica ao esportivo de alta performance. Fichas técnicas completas e modelos 3D interativos entram no ar nas próximas semanas.</p>
@@ -1581,6 +1659,51 @@ btnLogout.addEventListener('click', async () => {
       errorBox.textContent = err.message || 'Erro ao enviar. Tente novamente.';
     }
   });
+})();
+</script>
+
+<script>
+// --- Seção "Auron em números" — busca /financeiro/live a cada 3s ---
+(function () {
+  const elEntrada = document.getElementById('finEntrada');
+  const elSaida = document.getElementById('finSaida');
+  const elSaldo = document.getElementById('finSaldo');
+  const elUsd = document.getElementById('finUsd');
+  if (!elEntrada || !elSaida || !elSaldo) return;
+
+  const fmtBRL = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  function pulse(el) {
+    el.classList.remove('pulse');
+    void el.offsetWidth; // reinicia a animação
+    el.classList.add('pulse');
+  }
+
+  function setValue(el, text) {
+    if (el.textContent !== text) {
+      el.textContent = text;
+      pulse(el);
+    }
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch('/financeiro/live');
+      if (!r.ok) return;
+      const data = await r.json();
+      setValue(elEntrada, fmtBRL(data.entrada));
+      setValue(elSaida, fmtBRL(data.saida));
+      setValue(elSaldo, fmtBRL(data.saldo));
+      if (elUsd && data.usdBrl) {
+        elUsd.textContent = 'R$ ' + Number(data.usdBrl).toFixed(4).replace('.', ',');
+      }
+    } catch {
+      // silencioso: mantém o último valor exibido em caso de falha pontual
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 3000);
 })();
 </script>
 
