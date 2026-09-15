@@ -2,15 +2,16 @@
 // landing page (seção "Auron em Números").
 //
 // Como funciona:
-//   - Entrada, saída e saldo (liquidez/patrimônio) ficam persistidos no
-//     Mongo, num único documento (_id: 'geral') na collection "Financeiro".
+//   - Entrada e saída ficam persistidas no Mongo, num único documento
+//     (_id: 'geral') na collection "Financeiro". Saldo (liquidez) NÃO é
+//     mais persistido: é calculado sempre como entrada - saida na leitura.
+//   - Entrada é um valor FIXO (ENTRADA_SEED), controlado manualmente pelo
+//     RH direto no Atlas — não tem timer nem geração automática.
 //   - O que roda "em memória" é só o AGENDADOR do próximo incremento de
 //     saída: um setTimeout com atraso aleatório entre 10s e 170s. A cada
 //     disparo, gera um valor aleatório em R$ (140,00 a 1.515,99), CONVERTE
 //     pela cotação atual do USD/BRL (dividindo pelo dólar) e soma esse
 //     resultado ao total de saída + persiste no Mongo.
-//   - Entrada não é gerada automaticamente aqui: fica em 0 até o sistema de
-//     notas fiscais (a implementar depois) alimentar esse valor.
 //   - A cotação do dólar é cacheada por alguns minutos (não precisa buscar
 //     a cada disparo do timer) e vem da AwesomeAPI, que não exige chave.
 
@@ -64,21 +65,27 @@ function randomTimerDelay() {
 // ---------------------------------------------------------------------------
 // Persistência — documento único "geral"
 // ---------------------------------------------------------------------------
+const ENTRADA_SEED = 1175872637.51; // valor fixo — controlado manualmente pelo RH no Atlas
+
 async function getState() {
   const col = await connectFinanceiro();
   let doc = await col.findOne({ _id: 'geral' });
   if (!doc) {
-    doc = { _id: 'geral', entrada: 0, saida: 0, saldo: 0, updated_at: new Date() };
+    doc = { _id: 'geral', entrada: ENTRADA_SEED, saida: 0, updated_at: new Date() };
     await col.insertOne(doc);
   }
-  return doc;
+  const entrada = doc.entrada || 0;
+  const saida = doc.saida || 0;
+  // Liquidez nao fica mais persistida isolada: e sempre entrada - saida,
+  // calculada na leitura, pra nunca dessincronizar dos dois campos fonte.
+  return { ...doc, entrada, saida, saldo: entrada - saida };
 }
 
 async function applySaida(valor) {
   const col = await connectFinanceiro();
   const result = await col.findOneAndUpdate(
     { _id: 'geral' },
-    { $inc: { saida: valor, saldo: -valor }, $set: { updated_at: new Date() } },
+    { $inc: { saida: valor }, $set: { updated_at: new Date() } },
     { upsert: true, returnDocument: 'after' }
   );
   return result.value || result; // compat entre versões do driver
