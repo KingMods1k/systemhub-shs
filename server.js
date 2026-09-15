@@ -902,7 +902,7 @@ footer{
   <p class="hero-sub">Projetamos, fabricamos e entregamos veículos com a mesma régua: precisão de linha de montagem e obsessão pelo detalhe. Esta é a Auron.</p>
   <div class="hero-meta">
     <div><strong>04</strong>modelos em linha</div>
-    <div><strong>018</strong>ano de fundação</div>
+    <div><strong>2018</strong>ano de fundação</div>
     <div><strong>03</strong>unidades operacionais</div>
   </div>
 </header>
@@ -913,7 +913,7 @@ footer{
   <div class="sobre-grid">
     <p class="section-lede reveal reveal-delay-2">A Auron nasce para ocupar o espaço entre a engenharia pesada e a experiência de quem compra o carro pronto. Uma única companhia cuidando de toda a cadeia: fábrica própria, concessionária própria, padrão único do primeiro parafuso à entrega das chaves. Três unidades, uma só régua de qualidade — Auron Company Center (fábrica), Auron Dealership (concessionária) e Auron Company Invest (holding financeira).</p>
     <div class="sobre-stats reveal reveal-delay-3">
-      <div class="stat-row"><span class="stat-label">Exportações realizadas</span><span class="stat-value">873.817</span></div>
+      <div class="stat-row"><span class="stat-label">Exportações realizadas</span><span class="stat-value">4.817</span></div>
       <div class="stat-row"><span class="stat-label">Satisfação jurídica e legal</span><span class="stat-value">97,3%</span></div>
       <div class="stat-row"><span class="stat-label">Reputação geral de mercado</span><span class="stat-value">78%</span></div>
     </div>
