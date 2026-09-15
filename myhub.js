@@ -404,6 +404,20 @@ header{
 
 <script>
 
+// --- Elementos principais / navegação ---
+const navAdmitir = document.getElementById('navAdmitir');
+const navAdmitidos = document.getElementById('navAdmitidos');
+const navProcessos = document.getElementById('navProcessos');
+const emptyState = document.getElementById('emptyState');
+const panelAdmitir = document.getElementById('panelAdmitir');
+const panelAdmitidos = document.getElementById('panelAdmitidos');
+const panelProcessos = document.getElementById('panelProcessos');
+const dataInput = document.getElementById('f-data');
+
+
+
+
+
 dataInput.value = new Date().toISOString().slice(0, 10);
 
 navAdmitir.addEventListener('click', () => {
@@ -569,21 +583,9 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// --- Navegação das abas ---
-const navAdmitir = document.getElementById('navAdmitir');
-const navAdmitidos = document.getElementById('navAdmitidos');
-const navProcessos = document.getElementById('navProcessos');
-
-const emptyState = document.getElementById('emptyState');
-
-const panelAdmitir = document.getElementById('panelAdmitir');
-const panelAdmitidos = document.getElementById('panelAdmitidos');
-const panelProcessos = document.getElementById('panelProcessos');
-
-// --- Aba "Admitir" ---
-const dataInput = document.getElementById('f-data');
-
 // --- Aba "Admitidos" ---
+
+
 const admitidosLista = document.getElementById('admitidosLista');
 const admitidosDetalhe = document.getElementById('admitidosDetalhe');
 const voltarLista = document.getElementById('voltarLista');
@@ -830,8 +832,8 @@ formEditar.addEventListener('submit', async (e) => {
 });
 
 // --- Aba "Processos" (inscritos pela página inicial) ---
-const navProcessos = document.getElementById('navProcessos');
-const panelProcessos = document.getElementById('panelProcessos');
+
+
 const processosLista = document.getElementById('processosLista');
 const processosBusca = document.getElementById('processosBusca');
 const processosDetalhe = document.getElementById('processosDetalhe');
