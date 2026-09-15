@@ -556,7 +556,7 @@ footer{
       <div class="nav-user">${displayName}</div>
       <button class="nav-dots" id="navDotsBtn" aria-haspopup="true" aria-expanded="false" aria-label="Menu do usuário">⋯</button>
       <div class="nav-dropdown" id="navDropdown">
-        ${user.permission === 'authentic' ? '<button class="nav-dropdown-item" id="btnManageProfile">Gerenciar Perfil</button>' : ''}
+        ${user.permission === 'authentic' ? '<button class="nav-dropdown-item" id="btnManageProfile">Gerenciar</button>' : ''}
         <button class="nav-dropdown-item" id="btnSupport">Suporte</button>
         <button class="nav-dropdown-item" id="btnLogout">Sair</button>
       </div>
@@ -589,8 +589,8 @@ footer{
   </h1>
   <p class="hero-sub">Projetamos, fabricamos e entregamos veículos com a mesma régua: precisão de linha de montagem e obsessão pelo detalhe. Esta é a Auron.</p>
   <div class="hero-meta">
-    <div><strong>29</strong>modelos em linha</div>
-    <div><strong>1926</strong>ano de fundação</div>
+    <div><strong>04</strong>modelos em linha</div>
+    <div><strong>018</strong>ano de fundação</div>
     <div><strong>03</strong>unidades operacionais</div>
   </div>
 </header>

@@ -180,8 +180,8 @@ form{display:flex;flex-direction:column;gap:16px}
   <h1 class="side-title">Engenharia<br>em <em>movimento.</em></h1>
   <p class="side-lede">Fábrica e concessionária próprias, do primeiro parafuso à entrega das chaves. Acesse para acompanhar a linha Auron MVIST.</p>
   <div class="side-stats">
-    <div><strong>29</strong>modelos em linha</div>
-    <div><strong>1926</strong>fundação</div>
+    <div><strong>04</strong>modelos em linha</div>
+    <div><strong>2018</strong>fundação</div>
     <div><strong>03</strong>unidades</div>
   </div>
 </div>
