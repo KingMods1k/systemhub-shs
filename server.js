@@ -1387,12 +1387,12 @@ btnLogout.addEventListener('click', async () => {
 
   // Nome: so letras (com acento) e espaco
   campoNome.addEventListener('input', () => {
-    campoNome.value = campoNome.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s]/g, '').slice(0, 100);
+    campoNome.value = campoNome.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ ]/g, '').slice(0, 100);
   });
 
   // Endereco: letras, numeros, "." e "-"
   campoEndereco.addEventListener('input', () => {
-    campoEndereco.value = campoEndereco.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9.\-\s]/g, '').slice(0, 160);
+    campoEndereco.value = campoEndereco.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9. -]/g, '').slice(0, 160);
   });
 
   // --- Validação de CPF (dígitos verificadores) no client, espelhando o servidor ---
