@@ -83,6 +83,17 @@ function rsaDecrypt(encryptedBuffer, privateKeyPem) {
   );
 }
 
+// Importa uma chave publica RSA que o NAVEGADOR gerou (SPKI em Base64 "cru",
+// sem cabecalho/rodape PEM — mesmo formato que o front ja manda pra outras
+// rotas). Devolve um KeyObject que rsaEncrypt aceita direto no campo "key".
+function importBrowserPublicKey(base64Spki) {
+  return crypto.createPublicKey({
+    key: Buffer.from(base64Spki, 'base64'),
+    format: 'der',
+    type: 'spki',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Assinatura — RSA-PSS + SHA-256
 // ---------------------------------------------------------------------------
@@ -155,6 +166,7 @@ module.exports = {
   aesDecrypt,
   rsaEncrypt,
   rsaDecrypt,
+  importBrowserPublicKey,
   sign,
   verify,
   getServerPublicKey,

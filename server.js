@@ -370,6 +370,114 @@ app.post('/myhub/admitir', requireAuth, async (req, res) => {
   }
 });
 
+// POST /myhub/admitidos/listar — recebe a chave publica RSA que o NAVEGADOR gerou na hora
+// (fica so em memoria da pagina), busca todos os funcionarios em "RHs" (se esta la, ja foi
+// admitido — nao existe status separado), descriptografa os documentos com a chave PERMANENTE
+// do server, monta um pacote (dados pessoais + PDFs) e cifra tudo de novo (AES efemero +
+// RSA-OAEP) usando a chave publica que o navegador mandou. O navegador descriptografa com a
+// privada dele, que nunca sai do browser.
+app.post('/myhub/admitidos/listar', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { publicKey } = req.body || {};
+  if (!publicKey) {
+    return res.status(400).json({ error: 'Chave publica ausente.' });
+  }
+
+  try {
+    const { connectRHs } = require('./db');
+    const rhs = await connectRHs();
+    const registros = await rhs.find({}).toArray();
+
+    const funcionarios = registros.map((doc) => {
+      const documentos = (doc.documentos || []).map((d) => {
+        const aesKey = documentCrypto.rsaDecrypt(
+          Buffer.from(d.chave_cifrada, 'base64'),
+          documentCrypto.getServerPrivateKey()
+        );
+        const conteudo = documentCrypto.aesDecrypt(
+          Buffer.from(d.arquivo_cifrado, 'base64'),
+          aesKey,
+          Buffer.from(d.iv, 'base64'),
+          Buffer.from(d.auth_tag, 'base64')
+        );
+        return {
+          _id: String(d._id),
+          mimetype: d.mimetype,
+          conteudo: conteudo.toString('base64'),
+        };
+      });
+
+      return {
+        _id: String(doc._id),
+        nome: doc.nome,
+        idade: doc.idade,
+        data: doc.data,
+        email: doc.email,
+        tel: doc.tel,
+        endereco: doc.endereco,
+        cpf: doc.cpf,
+        rg: doc.rg,
+        cargo: doc.cargo,
+        funcoes: doc.funcoes,
+        cnpj: doc.cnpj,
+        documentos,
+      };
+    });
+
+    const plaintext = Buffer.from(JSON.stringify({ funcionarios }), 'utf8');
+
+    const browserPublicKey = documentCrypto.importBrowserPublicKey(publicKey);
+    const aesKey = documentCrypto.generateAesKey();
+    const { ciphertext, iv, authTag } = documentCrypto.aesEncrypt(plaintext, aesKey);
+    const encryptedAesKey = documentCrypto.rsaEncrypt(aesKey, browserPublicKey);
+
+    return res.json({
+      encryptedAesKey: encryptedAesKey.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64'),
+      ciphertext: ciphertext.toString('base64'),
+    });
+  } catch (err) {
+    console.error('Erro ao listar admitidos:', err);
+    return res.status(500).json({ error: 'Erro interno ao listar admitidos.' });
+  }
+});
+
+// POST /myhub/admitidos/editar — mesma validacao do /myhub/admitir, mas faz updateOne por
+// _id em vez de insertOne (edita os dados de um funcionario que ja existe em "RHs").
+app.post('/myhub/admitidos/editar', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { funcionarioId, nome, idade, data, email, tel, endereco, cpf, rg, cargo, funcoes, cnpj } = req.body || {};
+  if (!funcionarioId || !nome || !idade || !data || !email || !tel || !endereco || !cpf || !rg || !cargo || !funcoes || !cnpj) {
+    return res.status(400).json({ error: 'Preencha todos os campos.' });
+  }
+
+  try {
+    const { ObjectId } = require('mongodb');
+    const { connectRHs } = require('./db');
+    const rhs = await connectRHs();
+    const result = await rhs.updateOne(
+      { _id: new ObjectId(funcionarioId) },
+      { $set: { nome, idade, data, email, tel, endereco, cpf, rg, cargo, funcoes, cnpj } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Funcionario nao encontrado.' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao editar admitido:', err);
+    return res.status(500).json({ error: 'Erro interno ao editar admitido.' });
+  }
+});
+
 // GET /myhub/documento/rsa-temp — gera uma chave RSA temporaria (uso unico, 5min de validade)
 // pro app cifrar o pacote com. A chave privada correspondente nunca sai da RAM do server.
 app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
@@ -387,8 +495,10 @@ app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
 // RSA temporaria, cifra de novo com a chave PERMANENTE do servidor (.env), assina com a
 // chave privada permanente e guarda tudo cifrado dentro do registro em "RHs".
 //
-// Corpo esperado (tudo em Base64, exceto keyId/funcionarioId/mimetype):
-// { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext }
+// Corpo esperado (tudo em Base64, exceto keyId/funcionarioId/mimetype/substituirId):
+// { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext, substituirId? }
+// Se "substituirId" vier preenchido (_id de um documento que ja existe no array), o documento
+// e trocado no lugar (update); sem ele, o comportamento e o de sempre — empilha (push) mais um.
 app.post('/myhub/documento/upload', requireAuth, express.json({ limit: '20mb' }), async (req, res) => {
   console.log('[upload] rota alcancada. body keys:', Object.keys(req.body || {}));
 
@@ -397,7 +507,7 @@ app.post('/myhub/documento/upload', requireAuth, express.json({ limit: '20mb' })
     return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
   }
 
-  const { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext } = req.body || {};
+  const { keyId, funcionarioId, mimetype, encryptedAesKey, iv, authTag, ciphertext, substituirId } = req.body || {};
   if (!keyId || !funcionarioId || !mimetype || !encryptedAesKey || !iv || !authTag || !ciphertext) {
     console.log('[upload] pacote incompleto. presentes:', {
       keyId: !!keyId, funcionarioId: !!funcionarioId, mimetype: !!mimetype,
@@ -436,27 +546,51 @@ app.post('/myhub/documento/upload', requireAuth, express.json({ limit: '20mb' })
     const { ObjectId } = require('mongodb');
     const { connectRHs } = require('./db');
     const rhs = await connectRHs();
-    const result = await rhs.updateOne(
-      { _id: new ObjectId(funcionarioId) },
-      {
-        $push: {
-          documentos: {
-            _id: new ObjectId(),
-            mimetype,
-            arquivo_cifrado: newCiphertext,
-            chave_cifrada: encryptedAesKeyServer,
-            iv: newIv,
-            auth_tag: newAuthTag,
-            assinatura: signature,
-            enviado_por: req.user.email,
-            created_at: new Date(),
+
+    let result;
+    if (substituirId) {
+      // Modo substituir: troca o documento existente no lugar (mesmo _id),
+      // sem empilhar mais um item no array.
+      result = await rhs.updateOne(
+        { _id: new ObjectId(funcionarioId), 'documentos._id': new ObjectId(substituirId) },
+        {
+          $set: {
+            'documentos.$.mimetype': mimetype,
+            'documentos.$.arquivo_cifrado': newCiphertext,
+            'documentos.$.chave_cifrada': encryptedAesKeyServer,
+            'documentos.$.iv': newIv,
+            'documentos.$.auth_tag': newAuthTag,
+            'documentos.$.assinatura': signature,
+            'documentos.$.enviado_por': req.user.email,
+            'documentos.$.created_at': new Date(),
           },
-        },
-      }
-    );
+        }
+      );
+    } else {
+      result = await rhs.updateOne(
+        { _id: new ObjectId(funcionarioId) },
+        {
+          $push: {
+            documentos: {
+              _id: new ObjectId(),
+              mimetype,
+              arquivo_cifrado: newCiphertext,
+              chave_cifrada: encryptedAesKeyServer,
+              iv: newIv,
+              auth_tag: newAuthTag,
+              assinatura: signature,
+              enviado_por: req.user.email,
+              created_at: new Date(),
+            },
+          },
+        }
+      );
+    }
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Funcionario nao encontrado.' });
+      return res.status(404).json({
+        error: substituirId ? 'Documento ou funcionario nao encontrado.' : 'Funcionario nao encontrado.',
+      });
     }
 
     return res.status(201).json({ ok: true });

@@ -123,6 +123,40 @@ header{
 .file-hint{font-size:12px;color:var(--text-dim);margin-top:2px}
 .file-hint.error{color:var(--red)}
 
+/* --- Admitidos --- */
+.admitidos-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px;border:1px solid var(--line);border-radius:2px;
+  margin-bottom:8px;cursor:pointer;transition:border-color .2s ease, background .2s ease;
+}
+.admitidos-item:hover{border-color:var(--gold-dim);background:var(--bg-alt)}
+.admitidos-item .nome{font-size:14px}
+.admitidos-item .cargo{font-size:12px;color:var(--text-dim)}
+
+.detalhe{display:none;margin-top:8px}
+.detalhe.visible{display:block}
+.detalhe.visible ~ #admitidosLista{display:none}
+.btn-voltar{
+  background:none;border:none;color:var(--text-dim);font-family:'Archivo',sans-serif;
+  font-size:13px;cursor:pointer;padding:0;margin-bottom:20px;transition:color .2s ease;
+}
+.btn-voltar:hover{color:var(--gold)}
+
+.docs-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.03em;margin:28px 0 12px}
+.doc-card{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:12px 14px;border:1px solid var(--line);border-radius:2px;margin-bottom:8px;
+}
+.doc-card .doc-nome{font-size:13px;color:var(--text-dim)}
+.doc-card .doc-acoes{display:flex;gap:8px;flex:none}
+.btn-mini{
+  background:none;border:1px solid var(--line);color:var(--text);
+  font-family:'Archivo',sans-serif;font-size:12px;padding:7px 12px;border-radius:2px;
+  cursor:pointer;transition:border-color .2s ease, color .2s ease;
+}
+.btn-mini:hover{border-color:var(--gold-dim);color:var(--gold)}
+.reenvio-field{margin-top:6px}
+
 .processing-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.78);
   display:none;align-items:center;justify-content:center;
@@ -148,6 +182,7 @@ header{
 <div class="hub-body">
   <div class="sidebar">
     <button class="sidebar-item" id="navAdmitir">Admitir</button>
+    <button class="sidebar-item" id="navAdmitidos">Admitidos</button>
   </div>
 
   <div class="main">
@@ -212,6 +247,73 @@ header{
         <div class="msg" id="msg"></div>
       </form>
     </div>
+
+    <div class="panel" id="panelAdmitidos">
+      <h2>Admitidos</h2>
+
+      <div id="admitidosLista"></div>
+
+      <div class="detalhe" id="admitidosDetalhe">
+        <button type="button" class="btn-voltar" id="voltarLista">&larr; Voltar</button>
+        <form id="formEditar">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="e-nome">Nome</label>
+              <input type="text" id="e-nome" required>
+            </div>
+            <div class="field">
+              <label for="e-idade">Idade</label>
+              <input type="number" id="e-idade" min="14" max="120" required>
+            </div>
+            <div class="field">
+              <label for="e-data">Data</label>
+              <input type="date" id="e-data" required>
+            </div>
+            <div class="field">
+              <label for="e-email">Email</label>
+              <input type="email" id="e-email" required>
+            </div>
+            <div class="field">
+              <label for="e-tel">Tel</label>
+              <input type="tel" id="e-tel" required>
+            </div>
+            <div class="field full">
+              <label for="e-endereco">Endereço</label>
+              <input type="text" id="e-endereco" required>
+            </div>
+            <div class="field">
+              <label for="e-cpf">CPF</label>
+              <input type="text" id="e-cpf" required>
+            </div>
+            <div class="field">
+              <label for="e-rg">RG</label>
+              <input type="text" id="e-rg" required>
+            </div>
+            <div class="field">
+              <label for="e-cargo">Cargo</label>
+              <input type="text" id="e-cargo" required>
+            </div>
+            <div class="field">
+              <label for="e-funcoes">Funções</label>
+              <input type="text" id="e-funcoes" required>
+            </div>
+            <div class="field full">
+              <label for="e-cnpj">CNPJ</label>
+              <input type="text" id="e-cnpj" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="salvarEdicaoBtn">Salvar alterações</button>
+          <div class="msg" id="msgEditar"></div>
+        </form>
+
+        <h3 class="docs-title">Documentos</h3>
+        <div id="documentosLista"></div>
+        <div class="field full reenvio-field">
+          <label for="e-reenviar">Enviar novo documento (substitui o selecionado)</label>
+          <input type="file" id="e-reenviar" accept="application/pdf" style="display:none">
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -229,6 +331,9 @@ const dataInput = document.getElementById('f-data');
 dataInput.value = new Date().toISOString().slice(0, 10);
 
 navAdmitir.addEventListener('click', () => {
+  navAdmitir.classList.remove('active');
+  navAdmitidos.classList.remove('active');
+  panelAdmitidos.classList.remove('visible');
   navAdmitir.classList.add('active');
   emptyState.style.display = 'none';
   panelAdmitir.classList.add('visible');
@@ -287,7 +392,8 @@ async function importTempRsaPublicKey(base64Key) {
 }
 
 // Cifra 1 arquivo (AES-256-GCM + envelope RSA-OAEP com chave temporaria) e envia.
-async function encryptAndUploadFile(file, funcionarioId) {
+// Se "substituirId" for passado, o documento troca no lugar em vez de empilhar mais um.
+async function encryptAndUploadFile(file, funcionarioId, substituirId) {
   const tempRes = await fetch('/myhub/documento/rsa-temp');
   if (!tempRes.ok) throw new Error('Nao foi possivel obter chave temporaria do servidor.');
   const { keyId, publicKey } = await tempRes.json();
@@ -312,18 +418,21 @@ async function encryptAndUploadFile(file, funcionarioId) {
     throw new Error('Falha ao cifrar a chave com RSA: ' + e.name + (e.message ? ' — ' + e.message : ''));
   }
 
+  const uploadBody = {
+    keyId,
+    funcionarioId,
+    mimetype: file.type || 'application/pdf',
+    encryptedAesKey: bufferToBase64(encryptedAesKey),
+    iv: bufferToBase64(iv),
+    authTag: bufferToBase64(authTag),
+    ciphertext: bufferToBase64(ciphertext),
+  };
+  if (substituirId) uploadBody.substituirId = substituirId;
+
   const uploadRes = await fetch('/myhub/documento/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      keyId,
-      funcionarioId,
-      mimetype: file.type || 'application/pdf',
-      encryptedAesKey: bufferToBase64(encryptedAesKey),
-      iv: bufferToBase64(iv),
-      authTag: bufferToBase64(authTag),
-      ciphertext: bufferToBase64(ciphertext),
-    }),
+    body: JSON.stringify(uploadBody),
   });
 
   if (!uploadRes.ok) {
@@ -379,6 +488,238 @@ form.addEventListener('submit', async (e) => {
     msg.className = 'msg error';
     msg.textContent = err.message || 'Erro de conexão.';
     submitBtn.disabled = false;
+  }
+});
+
+// --- Aba "Admitidos" ---
+const navAdmitidos = document.getElementById('navAdmitidos');
+const panelAdmitidos = document.getElementById('panelAdmitidos');
+const admitidosLista = document.getElementById('admitidosLista');
+const admitidosDetalhe = document.getElementById('admitidosDetalhe');
+const voltarLista = document.getElementById('voltarLista');
+const formEditar = document.getElementById('formEditar');
+const salvarEdicaoBtn = document.getElementById('salvarEdicaoBtn');
+const msgEditar = document.getElementById('msgEditar');
+const documentosLista = document.getElementById('documentosLista');
+const reenviarInput = document.getElementById('e-reenviar');
+
+let funcionarios = [];
+let funcionarioAtual = null;
+let reenviarDocId = null;
+
+// Gera um par RSA-OAEP DIRETO no navegador — a privada nunca sai daqui.
+async function generateRsaKeyPair() {
+  return crypto.subtle.generateKey(
+    { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+navAdmitidos.addEventListener('click', async () => {
+  navAdmitir.classList.remove('active');
+  panelAdmitir.classList.remove('visible');
+  navAdmitidos.classList.add('active');
+  emptyState.style.display = 'none';
+  panelAdmitidos.classList.add('visible');
+  admitidosDetalhe.classList.remove('visible');
+  await loadAdmitidos();
+});
+
+async function loadAdmitidos() {
+  admitidosLista.innerHTML = '<div class="file-hint">Carregando...</div>';
+  try {
+    const keyPair = await generateRsaKeyPair();
+    const spki = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+    const publicKeyB64 = bufferToBase64(spki);
+
+    const res = await fetch('/myhub/admitidos/listar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicKey: publicKeyB64 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao carregar admitidos.');
+
+    const encryptedAesKey = base64ToArrayBuffer(data.encryptedAesKey);
+    const rawAesKey = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, keyPair.privateKey, encryptedAesKey);
+    const aesKey = await crypto.subtle.importKey('raw', rawAesKey, { name: 'AES-GCM' }, false, ['decrypt']);
+
+    const ciphertext = new Uint8Array(base64ToArrayBuffer(data.ciphertext));
+    const authTag = new Uint8Array(base64ToArrayBuffer(data.authTag));
+    const iv = base64ToArrayBuffer(data.iv);
+
+    // Web Crypto espera ciphertext + tag colados no final.
+    const combined = new Uint8Array(ciphertext.length + authTag.length);
+    combined.set(ciphertext, 0);
+    combined.set(authTag, ciphertext.length);
+
+    const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, combined);
+    const json = JSON.parse(new TextDecoder().decode(plainBuffer));
+    funcionarios = json.funcionarios || [];
+    renderAdmitidosList();
+  } catch (err) {
+    admitidosLista.innerHTML = '';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg error';
+    errDiv.textContent = err.message || 'Erro ao carregar admitidos.';
+    admitidosLista.appendChild(errDiv);
+  }
+}
+
+function renderAdmitidosList() {
+  admitidosLista.innerHTML = '';
+  if (funcionarios.length === 0) {
+    admitidosLista.innerHTML = '<div class="file-hint">Nenhum funcionário admitido ainda.</div>';
+    return;
+  }
+  funcionarios.forEach((f) => {
+    const item = document.createElement('div');
+    item.className = 'admitidos-item';
+    item.innerHTML =
+      '<span class="nome">' + escapeHtml(f.nome) + '</span>' +
+      '<span class="cargo">' + escapeHtml(f.cargo) + '</span>';
+    item.addEventListener('click', () => abrirDetalhe(f._id));
+    admitidosLista.appendChild(item);
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str == null ? '' : str);
+  return div.innerHTML;
+}
+
+function abrirDetalhe(id) {
+  funcionarioAtual = funcionarios.find((f) => f._id === id);
+  if (!funcionarioAtual) return;
+
+  document.getElementById('e-nome').value = funcionarioAtual.nome || '';
+  document.getElementById('e-idade').value = funcionarioAtual.idade || '';
+  document.getElementById('e-data').value = funcionarioAtual.data || '';
+  document.getElementById('e-email').value = funcionarioAtual.email || '';
+  document.getElementById('e-tel').value = funcionarioAtual.tel || '';
+  document.getElementById('e-endereco').value = funcionarioAtual.endereco || '';
+  document.getElementById('e-cpf').value = funcionarioAtual.cpf || '';
+  document.getElementById('e-rg').value = funcionarioAtual.rg || '';
+  document.getElementById('e-cargo').value = funcionarioAtual.cargo || '';
+  document.getElementById('e-funcoes').value = funcionarioAtual.funcoes || '';
+  document.getElementById('e-cnpj').value = funcionarioAtual.cnpj || '';
+  msgEditar.className = 'msg';
+  msgEditar.textContent = '';
+
+  renderDocumentos();
+  admitidosDetalhe.classList.add('visible');
+}
+
+voltarLista.addEventListener('click', () => {
+  admitidosDetalhe.classList.remove('visible');
+  funcionarioAtual = null;
+});
+
+function renderDocumentos() {
+  documentosLista.innerHTML = '';
+  const documentos = (funcionarioAtual && funcionarioAtual.documentos) || [];
+  if (documentos.length === 0) {
+    documentosLista.innerHTML = '<div class="file-hint">Nenhum documento enviado.</div>';
+    return;
+  }
+  documentos.forEach((doc, idx) => {
+    const card = document.createElement('div');
+    card.className = 'doc-card';
+    card.innerHTML =
+      '<span class="doc-nome">Documento ' + (idx + 1) + ' — ' + escapeHtml(doc.mimetype) + '</span>' +
+      '<span class="doc-acoes">' +
+      '<button type="button" class="btn-mini" data-acao="baixar">Baixar</button>' +
+      '<button type="button" class="btn-mini" data-acao="reenviar">Reenviar</button>' +
+      '</span>';
+    card.querySelector('[data-acao="baixar"]').addEventListener('click', () => baixarDocumento(doc));
+    card.querySelector('[data-acao="reenviar"]').addEventListener('click', () => {
+      reenviarDocId = doc._id;
+      reenviarInput.value = '';
+      reenviarInput.click();
+    });
+    documentosLista.appendChild(card);
+  });
+}
+
+function baixarDocumento(doc) {
+  const bytes = base64ToArrayBuffer(doc.conteudo);
+  const blob = new Blob([bytes], { type: doc.mimetype || 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (funcionarioAtual.nome || 'documento').replace(/\s+/g, '_') + '.pdf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+reenviarInput.addEventListener('change', async () => {
+  const file = reenviarInput.files && reenviarInput.files[0];
+  if (!file || !funcionarioAtual || !reenviarDocId) return;
+
+  processingText.textContent = 'Reenviando documento...';
+  processingOverlay.classList.add('active');
+  try {
+    await encryptAndUploadFile(file, funcionarioAtual._id, reenviarDocId);
+    await loadAdmitidos();
+    const id = funcionarioAtual._id;
+    abrirDetalhe(id);
+    msgEditar.className = 'msg success';
+    msgEditar.textContent = 'Documento substituído com sucesso.';
+  } catch (err) {
+    msgEditar.className = 'msg error';
+    msgEditar.textContent = err.message || 'Erro ao reenviar documento.';
+  } finally {
+    processingOverlay.classList.remove('active');
+    reenviarDocId = null;
+  }
+});
+
+formEditar.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!funcionarioAtual) return;
+
+  const payload = {
+    funcionarioId: funcionarioAtual._id,
+    nome: document.getElementById('e-nome').value.trim(),
+    idade: document.getElementById('e-idade').value,
+    data: document.getElementById('e-data').value,
+    email: document.getElementById('e-email').value.trim(),
+    tel: document.getElementById('e-tel').value.trim(),
+    endereco: document.getElementById('e-endereco').value.trim(),
+    cpf: document.getElementById('e-cpf').value.trim(),
+    rg: document.getElementById('e-rg').value.trim(),
+    cargo: document.getElementById('e-cargo').value.trim(),
+    funcoes: document.getElementById('e-funcoes').value.trim(),
+    cnpj: document.getElementById('e-cnpj').value.trim(),
+  };
+
+  msgEditar.className = 'msg';
+  msgEditar.textContent = '';
+  salvarEdicaoBtn.disabled = true;
+
+  try {
+    const r = await fetch('/myhub/admitidos/editar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Erro ao salvar.');
+
+    Object.assign(funcionarioAtual, payload);
+    delete funcionarioAtual.funcionarioId;
+    renderAdmitidosList();
+    msgEditar.className = 'msg success';
+    msgEditar.textContent = 'Dados salvos com sucesso.';
+  } catch (err) {
+    msgEditar.className = 'msg error';
+    msgEditar.textContent = err.message || 'Erro de conexão.';
+  } finally {
+    salvarEdicaoBtn.disabled = false;
   }
 });
 </script>
