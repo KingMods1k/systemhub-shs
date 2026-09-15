@@ -179,17 +179,60 @@ app.post('/vagas/inscrever', async (req, res) => {
   }
 });
 
-// POST /vagas/finalizar — segunda etapa da inscrição: recebe os dados pessoais
-// (apos o candidato escolher a vaga e clicar em "Continuar") e salva um
-// registro na collection "processos". Exige login (email vem da sessao, nunca
-// do body, entao nao da pra falsificar em nome de outra pessoa).
+// GET /vagas/rsa-temp — gera chave RSA temporaria (uso unico, 5min) pro
+// navegador do candidato cifrar os dados pessoais antes de enviar.
+// Mesmo padrao usado em /myhub/documento/rsa-temp, so que aberto a qualquer
+// usuario logado (nao so 'authentic'), ja que qualquer um pode se candidatar.
+app.get('/vagas/rsa-temp', requireAuth, (req, res) => {
+  const { keyId, publicKey } = documentCrypto.generateTempKeyPair();
+  return res.json({ keyId, publicKey });
+});
+
+// POST /vagas/finalizar — segunda etapa da inscrição. O navegador cifra os
+// dados pessoais com uma chave AES local, envelopa a chave AES com a RSA
+// temporaria (/vagas/rsa-temp) e manda { keyId, encryptedAesKey, iv, authTag,
+// ciphertext }. O servidor:
+//   1) decifra com a chave temp (uso unico, some da RAM depois);
+//   2) valida os campos em claro (nunca confia so no client);
+//   3) cifra de novo com uma chave AES nova, envelopada com a RSA PERMANENTE
+//      do servidor, e assina o pacote com a chave privada permanente;
+//   4) guarda so o pacote cifrado+assinado na collection "processos" — nada
+//      em texto puro fica no Mongo.
 app.post('/vagas/finalizar', requireAuth, async (req, res) => {
-  const validationError = validateProcessoFields(req.body);
+  const { keyId, encryptedAesKey, iv, authTag, ciphertext } = req.body || {};
+  if (!keyId || !encryptedAesKey || !iv || !authTag || !ciphertext) {
+    return res.status(400).json({ error: 'Pacote incompleto.' });
+  }
+
+  const tempPrivateKey = documentCrypto.consumeTempPrivateKey(keyId);
+  if (!tempPrivateKey) {
+    return res.status(400).json({ error: 'Chave temporaria invalida ou expirada. Recarregue a página e tente de novo.' });
+  }
+
+  let fields;
+  try {
+    // 1) Abre o pacote que veio do navegador (RSA temporaria -> chave AES -> JSON)
+    const aesKey = documentCrypto.rsaDecrypt(Buffer.from(encryptedAesKey, 'base64'), tempPrivateKey);
+    const plaintext = documentCrypto.aesDecrypt(
+      Buffer.from(ciphertext, 'base64'),
+      aesKey,
+      Buffer.from(iv, 'base64'),
+      Buffer.from(authTag, 'base64')
+    );
+    fields = JSON.parse(plaintext.toString('utf8'));
+  } catch (err) {
+    console.error('Erro ao decifrar pacote de inscricao:', err);
+    return res.status(400).json({ error: 'Não foi possível processar os dados enviados.' });
+  }
+
+  // 2) Valida os campos em claro, igual antes — nunca confia so no fato de
+  // estarem cifrados; cifrado nao significa valido.
+  const validationError = validateProcessoFields(fields);
   if (validationError) {
     return res.status(400).json({ error: validationError });
   }
 
-  const { nome, cpf, rg, estadoCivil, vagaId, dataNascimento, tel, endereco } = req.body;
+  const { nome, cpf, rg, estadoCivil, vagaId, dataNascimento, tel, endereco } = fields;
   const cpfDigits = cpf.replace(/\D/g, '');
   const rgDigits = rg.replace(/\D/g, '');
   const telDigits = tel.replace(/\D/g, '');
@@ -204,8 +247,9 @@ app.post('/vagas/finalizar', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Vaga não encontrada.' });
     }
 
-    const processos = await connectProcessos();
-    const result = await processos.insertOne({
+    // Monta o JSON final (com email vindo da sessao, nunca do body) e cifra
+    // de novo com uma chave AES nova, envelopada com a RSA PERMANENTE.
+    const registro = {
       nome: nome.trim(),
       cpf: formatCpf(cpfDigits),
       rg: formatRg(rgDigits),
@@ -216,6 +260,25 @@ app.post('/vagas/finalizar', requireAuth, async (req, res) => {
       dataNascimento,
       tel: formatTel(telDigits),
       endereco: endereco.trim(),
+      created_at: new Date().toISOString(),
+    };
+    const registroBuffer = Buffer.from(JSON.stringify(registro), 'utf8');
+
+    const newAesKey = documentCrypto.generateAesKey();
+    const { ciphertext: finalCiphertext, iv: finalIv, authTag: finalAuthTag } = documentCrypto.aesEncrypt(registroBuffer, newAesKey);
+    const encryptedAesKeyServer = documentCrypto.rsaEncrypt(newAesKey, documentCrypto.getServerPublicKey());
+
+    // 3) Assina o ciphertext com a chave privada permanente — garante
+    // integridade: qualquer adulteração do pacote no Mongo é detectável.
+    const signature = documentCrypto.sign(finalCiphertext, documentCrypto.getServerPrivateKey());
+
+    const processos = await connectProcessos();
+    const result = await processos.insertOne({
+      encryptedAesKey: encryptedAesKeyServer.toString('base64'),
+      iv: finalIv.toString('base64'),
+      authTag: finalAuthTag.toString('base64'),
+      ciphertext: finalCiphertext.toString('base64'),
+      signature: signature.toString('base64'),
       created_at: new Date(),
     });
 
@@ -1401,6 +1464,66 @@ btnLogout.addEventListener('click', async () => {
     overlay.classList.add('open');
   };
 
+  // --- Cifragem client-side (Web Crypto API), espelhando o esquema do servidor ---
+  // AES-256-GCM pro conteudo, RSA-OAEP (chave temp de uso unico) como envelope
+  // da chave AES. A chave temp expira em 5min e so pode ser usada uma vez.
+
+  function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  // A chave publica temp vem do servidor como Base64 "cru" (sem cabecalho PEM,
+  // ja extraido em crypto.js) no formato SPKI/DER — o que subtle.importKey espera.
+  async function importTempPublicKey(publicKeyBase64) {
+    return crypto.subtle.importKey(
+      'spki',
+      base64ToArrayBuffer(publicKeyBase64),
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false,
+      ['encrypt']
+    );
+  }
+
+  async function cifrarPayload(fields) {
+    const r = await fetch('/vagas/rsa-temp');
+    if (!r.ok) throw new Error('Não foi possível preparar o envio seguro. Tente novamente.');
+    const { keyId, publicKey } = await r.json();
+
+    const tempPublicKey = await importTempPublicKey(publicKey);
+
+    // Chave AES-256-GCM local, uso unico, nunca sai do navegador em claro
+    const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+    const ivBytes = crypto.getRandomValues(new Uint8Array(12));
+
+    const plaintext = new TextEncoder().encode(JSON.stringify(fields));
+    // Web Crypto AES-GCM devolve ciphertext+authTag concatenados (ultimos 16 bytes = tag)
+    const encryptedCombined = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, plaintext);
+    const combinedBytes = new Uint8Array(encryptedCombined);
+    const ciphertextBytes = combinedBytes.slice(0, combinedBytes.length - 16);
+    const authTagBytes = combinedBytes.slice(combinedBytes.length - 16);
+
+    const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+    const encryptedAesKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, tempPublicKey, rawAesKey);
+
+    return {
+      keyId,
+      encryptedAesKey: arrayBufferToBase64(encryptedAesKey),
+      iv: arrayBufferToBase64(ivBytes.buffer),
+      authTag: arrayBufferToBase64(authTagBytes.buffer),
+      ciphertext: arrayBufferToBase64(ciphertextBytes.buffer),
+    };
+  }
+
   btnEnviar.addEventListener('click', async () => {
     errorBox.textContent = '';
 
@@ -1428,10 +1551,11 @@ btnLogout.addEventListener('click', async () => {
     btnEnviar.disabled = true;
     btnEnviar.textContent = 'Enviando...';
     try {
+      const pacoteCifrado = await cifrarPayload(payload);
       const r = await fetch('/vagas/finalizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(pacoteCifrado),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Erro ao enviar inscrição.');
