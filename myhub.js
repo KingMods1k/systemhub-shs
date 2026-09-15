@@ -157,6 +157,33 @@ header{
 .btn-mini:hover{border-color:var(--gold-dim);color:var(--gold)}
 .reenvio-field{margin-top:6px}
 
+/* --- Processos --- */
+.processos-search{
+  width:100%;padding:12px 14px;border-radius:2px;border:1px solid var(--line);
+  background:var(--bg-alt);color:var(--text);font-size:14px;
+  font-family:'Archivo',sans-serif;margin-bottom:16px;transition:border-color .2s ease;
+}
+.processos-search:focus{outline:none;border-color:var(--gold-dim)}
+.processos-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px;border:1px solid var(--line);border-radius:2px;
+  margin-bottom:8px;cursor:pointer;transition:border-color .2s ease, background .2s ease;
+}
+.processos-item:hover{border-color:var(--gold-dim);background:var(--bg-alt)}
+.processos-item .nome-wrap{display:flex;align-items:center;gap:8px}
+.processos-item .nome{font-size:14px}
+.processos-item .vaga{font-size:12px;color:var(--text-dim)}
+.processos-item.nao-visto .nome{font-weight:700;color:var(--gold)}
+.badge-novo{
+  width:7px;height:7px;border-radius:50%;background:var(--gold);flex:none;
+}
+.campo-leitura{
+  padding:12px 14px;border-radius:2px;border:1px solid var(--line);
+  background:var(--bg-alt);color:var(--text);font-size:14px;
+}
+.btn-arquivar{background:var(--red);color:var(--text)}
+.btn-arquivar:hover:not(:disabled){background:#c94848}
+
 .processing-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.78);
   display:none;align-items:center;justify-content:center;
@@ -183,6 +210,7 @@ header{
   <div class="sidebar">
     <button class="sidebar-item" id="navAdmitir">Admitir</button>
     <button class="sidebar-item" id="navAdmitidos">Admitidos</button>
+    <button class="sidebar-item" id="navProcessos">Processos</button>
   </div>
 
   <div class="main">
@@ -314,6 +342,58 @@ header{
         </div>
       </div>
     </div>
+
+    <div class="panel" id="panelProcessos">
+      <h2>Processos</h2>
+
+      <input type="text" class="processos-search" id="processosBusca" placeholder="Pesquisar por nome, CPF, email, vaga...">
+
+      <div id="processosLista"></div>
+
+      <div class="detalhe" id="processosDetalhe">
+        <button type="button" class="btn-voltar" id="voltarListaProcessos">&larr; Voltar</button>
+        <div class="form-grid">
+          <div class="field full">
+            <label>Nome</label>
+            <div class="campo-leitura" id="p-nome"></div>
+          </div>
+          <div class="field">
+            <label>CPF</label>
+            <div class="campo-leitura" id="p-cpf"></div>
+          </div>
+          <div class="field">
+            <label>RG</label>
+            <div class="campo-leitura" id="p-rg"></div>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <div class="campo-leitura" id="p-email"></div>
+          </div>
+          <div class="field">
+            <label>Estado civil</label>
+            <div class="campo-leitura" id="p-estadoCivil"></div>
+          </div>
+          <div class="field">
+            <label>Data de nascimento</label>
+            <div class="campo-leitura" id="p-dataNascimento"></div>
+          </div>
+          <div class="field">
+            <label>Telefone</label>
+            <div class="campo-leitura" id="p-tel"></div>
+          </div>
+          <div class="field full">
+            <label>Endereço</label>
+            <div class="campo-leitura" id="p-endereco"></div>
+          </div>
+          <div class="field full">
+            <label>Vaga</label>
+            <div class="campo-leitura" id="p-vagaTitulo"></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-arquivar" id="arquivarBtn">Arquivar</button>
+        <div class="msg" id="msgProcesso"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -333,7 +413,9 @@ dataInput.value = new Date().toISOString().slice(0, 10);
 navAdmitir.addEventListener('click', () => {
   navAdmitir.classList.remove('active');
   navAdmitidos.classList.remove('active');
+  navProcessos.classList.remove('active');
   panelAdmitidos.classList.remove('visible');
+  panelProcessos.classList.remove('visible');
   navAdmitir.classList.add('active');
   emptyState.style.display = 'none';
   panelAdmitir.classList.add('visible');
@@ -518,12 +600,28 @@ async function generateRsaKeyPair() {
 
 navAdmitidos.addEventListener('click', async () => {
   navAdmitir.classList.remove('active');
+  navProcessos.classList.remove('active');
   panelAdmitir.classList.remove('visible');
+  panelProcessos.classList.remove('visible');
   navAdmitidos.classList.add('active');
   emptyState.style.display = 'none';
   panelAdmitidos.classList.add('visible');
   admitidosDetalhe.classList.remove('visible');
   await loadAdmitidos();
+});
+
+navProcessos.addEventListener('click', async () => {
+  navAdmitir.classList.remove('active');
+  navAdmitidos.classList.remove('active');
+  panelAdmitir.classList.remove('visible');
+  panelAdmitidos.classList.remove('visible');
+  navProcessos.classList.add('active');
+  emptyState.style.display = 'none';
+  panelProcessos.classList.add('visible');
+  processosDetalhe.classList.remove('visible');
+  processosLista.style.display = '';
+  processosBusca.value = '';
+  await loadProcessos();
 });
 
 async function loadAdmitidos() {
@@ -720,6 +818,169 @@ formEditar.addEventListener('submit', async (e) => {
     msgEditar.textContent = err.message || 'Erro de conexão.';
   } finally {
     salvarEdicaoBtn.disabled = false;
+  }
+});
+
+// --- Aba "Processos" (inscritos pela página inicial) ---
+const navProcessos = document.getElementById('navProcessos');
+const panelProcessos = document.getElementById('panelProcessos');
+const processosLista = document.getElementById('processosLista');
+const processosBusca = document.getElementById('processosBusca');
+const processosDetalhe = document.getElementById('processosDetalhe');
+const voltarListaProcessos = document.getElementById('voltarListaProcessos');
+const arquivarBtn = document.getElementById('arquivarBtn');
+const msgProcesso = document.getElementById('msgProcesso');
+
+let candidatos = [];
+let candidatoAtual = null;
+
+async function loadProcessos() {
+  processosLista.innerHTML = '<div class="file-hint">Carregando...</div>';
+  try {
+    const keyPair = await generateRsaKeyPair();
+    const spki = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+    const publicKeyB64 = bufferToBase64(spki);
+
+    const res = await fetch('/myhub/processos/listar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicKey: publicKeyB64 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao carregar processos.');
+
+    const encryptedAesKey = base64ToArrayBuffer(data.encryptedAesKey);
+    const rawAesKey = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, keyPair.privateKey, encryptedAesKey);
+    const aesKey = await crypto.subtle.importKey('raw', rawAesKey, { name: 'AES-GCM' }, false, ['decrypt']);
+
+    const ciphertext = new Uint8Array(base64ToArrayBuffer(data.ciphertext));
+    const authTag = new Uint8Array(base64ToArrayBuffer(data.authTag));
+    const iv = base64ToArrayBuffer(data.iv);
+
+    const combined = new Uint8Array(ciphertext.length + authTag.length);
+    combined.set(ciphertext, 0);
+    combined.set(authTag, ciphertext.length);
+
+    const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, combined);
+    const json = JSON.parse(new TextDecoder().decode(plainBuffer));
+    candidatos = json.candidatos || [];
+    renderProcessosList();
+  } catch (err) {
+    processosLista.innerHTML = '';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg error';
+    errDiv.textContent = err.message || 'Erro ao carregar processos.';
+    processosLista.appendChild(errDiv);
+  }
+}
+
+// Pesquisa é só um filtro local em cima do que já foi carregado/decifrado — não bate
+// no servidor de novo, e olha em todos os campos do candidato de uma vez.
+function candidatoBateComBusca(c, termo) {
+  if (!termo) return true;
+  const alvo = [c.nome, c.cpf, c.rg, c.email, c.estadoCivil, c.vagaTitulo, c.dataNascimento, c.tel, c.endereco]
+    .map((v) => String(v || '').toLowerCase())
+    .join(' ');
+  return alvo.includes(termo.toLowerCase());
+}
+
+function renderProcessosList() {
+  processosLista.innerHTML = '';
+  const termo = processosBusca.value.trim();
+  const filtrados = candidatos.filter((c) => candidatoBateComBusca(c, termo));
+
+  if (candidatos.length === 0) {
+    processosLista.innerHTML = '<div class="file-hint">Nenhuma inscrição recebida ainda.</div>';
+    return;
+  }
+  if (filtrados.length === 0) {
+    processosLista.innerHTML = '<div class="file-hint">Nenhum resultado para essa busca.</div>';
+    return;
+  }
+
+  filtrados.forEach((c) => {
+    const item = document.createElement('div');
+    item.className = 'processos-item' + (c.visto ? '' : ' nao-visto');
+    item.innerHTML =
+      '<span class="nome-wrap">' +
+      (c.visto ? '' : '<span class="badge-novo"></span>') +
+      '<span class="nome">' + escapeHtml(c.nome) + '</span>' +
+      '</span>' +
+      '<span class="vaga">' + escapeHtml(c.vagaTitulo) + '</span>';
+    item.addEventListener('click', () => abrirDetalheProcesso(c._id));
+    processosLista.appendChild(item);
+  });
+}
+
+processosBusca.addEventListener('input', renderProcessosList);
+
+async function abrirDetalheProcesso(id) {
+  candidatoAtual = candidatos.find((c) => c._id === id);
+  if (!candidatoAtual) return;
+
+  document.getElementById('p-nome').textContent = candidatoAtual.nome || '';
+  document.getElementById('p-cpf').textContent = candidatoAtual.cpf || '';
+  document.getElementById('p-rg').textContent = candidatoAtual.rg || '';
+  document.getElementById('p-email').textContent = candidatoAtual.email || '';
+  document.getElementById('p-estadoCivil').textContent = candidatoAtual.estadoCivil || '';
+  document.getElementById('p-dataNascimento').textContent = candidatoAtual.dataNascimento || '';
+  document.getElementById('p-tel').textContent = candidatoAtual.tel || '';
+  document.getElementById('p-endereco').textContent = candidatoAtual.endereco || '';
+  document.getElementById('p-vagaTitulo').textContent = candidatoAtual.vagaTitulo || '';
+  msgProcesso.className = 'msg';
+  msgProcesso.textContent = '';
+  arquivarBtn.disabled = false;
+
+  processosLista.style.display = 'none';
+  processosDetalhe.classList.add('visible');
+
+  // Marca como visto ao abrir — se já estava visto, não faz requisição à toa.
+  if (!candidatoAtual.visto) {
+    candidatoAtual.visto = true;
+    try {
+      await fetch('/myhub/processos/marcar-visto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processoId: candidatoAtual._id }),
+      });
+    } catch (err) {
+      // Falha silenciosa: pior caso, o registro continua aparecendo como não-visto
+      // na próxima vez que a lista for recarregada.
+    }
+  }
+}
+
+voltarListaProcessos.addEventListener('click', () => {
+  processosDetalhe.classList.remove('visible');
+  processosLista.style.display = '';
+  candidatoAtual = null;
+  renderProcessosList();
+});
+
+arquivarBtn.addEventListener('click', async () => {
+  if (!candidatoAtual) return;
+  arquivarBtn.disabled = true;
+  msgProcesso.className = 'msg';
+  msgProcesso.textContent = '';
+
+  try {
+    const r = await fetch('/myhub/processos/arquivar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ processoId: candidatoAtual._id }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Erro ao arquivar.');
+
+    candidatos = candidatos.filter((c) => c._id !== candidatoAtual._id);
+    candidatoAtual = null;
+    processosDetalhe.classList.remove('visible');
+    processosLista.style.display = '';
+    renderProcessosList();
+  } catch (err) {
+    msgProcesso.className = 'msg error';
+    msgProcesso.textContent = err.message || 'Erro de conexão.';
+    arquivarBtn.disabled = false;
   }
 });
 </script>

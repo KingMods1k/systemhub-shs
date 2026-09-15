@@ -478,6 +478,160 @@ app.post('/myhub/admitidos/editar', requireAuth, async (req, res) => {
   }
 });
 
+// POST /myhub/processos/listar — mesmo esquema do /myhub/admitidos/listar (recebe a chave
+// publica RSA que o navegador gerou na hora, devolve tudo recifrado com ela), so que lendo a
+// collection "processos" (candidatos que se inscreveram pela pagina inicial, ver /vagas/finalizar).
+// Cada registro e um pacote unico cifrado (nao um array de documentos como em RHs): decifra com
+// a chave PERMANENTE do servidor, confere a assinatura (integridade — qualquer adulteracao no
+// Mongo e detectada) e monta a lista.
+// Ordenacao: nao vistos primeiro, vistos depois (e por padrao, mais recente primeiro dentro de
+// cada grupo). Registros com "arquivado: true" nao entram na busca — nao sao deletados de
+// verdade, so somem do painel (ver /myhub/processos/arquivar).
+app.post('/myhub/processos/listar', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { publicKey } = req.body || {};
+  if (!publicKey) {
+    return res.status(400).json({ error: 'Chave publica ausente.' });
+  }
+
+  try {
+    const { connectProcessos } = require('./db');
+    const processos = await connectProcessos();
+    const registros = await processos.find({ arquivado: { $ne: true } }).toArray();
+
+    const candidatos = registros.map((doc) => {
+      let dados;
+      try {
+        const aesKey = documentCrypto.rsaDecrypt(
+          Buffer.from(doc.encryptedAesKey, 'base64'),
+          documentCrypto.getServerPrivateKey()
+        );
+        const ciphertextBuf = Buffer.from(doc.ciphertext, 'base64');
+
+        const assinaturaOk = documentCrypto.verify(
+          ciphertextBuf,
+          Buffer.from(doc.signature, 'base64'),
+          documentCrypto.getServerPublicKey()
+        );
+        if (!assinaturaOk) throw new Error('Assinatura invalida — registro pode ter sido adulterado.');
+
+        const conteudo = documentCrypto.aesDecrypt(
+          ciphertextBuf,
+          aesKey,
+          Buffer.from(doc.iv, 'base64'),
+          Buffer.from(doc.authTag, 'base64')
+        );
+        dados = JSON.parse(conteudo.toString('utf8'));
+      } catch (err) {
+        console.error('Erro ao decifrar processo ' + doc._id + ':', err.message);
+        return null; // pula registro corrompido em vez de derrubar a lista inteira
+      }
+
+      return {
+        _id: String(doc._id),
+        nome: dados.nome,
+        cpf: dados.cpf,
+        rg: dados.rg,
+        email: dados.email,
+        estadoCivil: dados.estadoCivil,
+        vagaTitulo: dados.vagaTitulo,
+        dataNascimento: dados.dataNascimento,
+        tel: dados.tel,
+        endereco: dados.endereco,
+        visto: !!doc.visto,
+        created_at: doc.created_at,
+      };
+    }).filter(Boolean);
+
+    // Nao vistos primeiro; dentro de cada grupo, mais recente primeiro.
+    candidatos.sort((a, b) => {
+      if (a.visto !== b.visto) return a.visto ? 1 : -1;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    const plaintext = Buffer.from(JSON.stringify({ candidatos }), 'utf8');
+
+    const browserPublicKey = documentCrypto.importBrowserPublicKey(publicKey);
+    const aesKey = documentCrypto.generateAesKey();
+    const { ciphertext, iv, authTag } = documentCrypto.aesEncrypt(plaintext, aesKey);
+    const encryptedAesKey = documentCrypto.rsaEncrypt(aesKey, browserPublicKey);
+
+    return res.json({
+      encryptedAesKey: encryptedAesKey.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64'),
+      ciphertext: ciphertext.toString('base64'),
+    });
+  } catch (err) {
+    console.error('Erro ao listar processos:', err);
+    return res.status(500).json({ error: 'Erro interno ao listar processos.' });
+  }
+});
+
+// POST /myhub/processos/marcar-visto — chamado quando o RH abre o detalhe de um candidato.
+// So seta o flag "visto"; o conteudo cifrado do registro nao e tocado.
+app.post('/myhub/processos/marcar-visto', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { processoId } = req.body || {};
+  if (!processoId) {
+    return res.status(400).json({ error: 'processoId ausente.' });
+  }
+
+  try {
+    const { ObjectId } = require('mongodb');
+    const { connectProcessos } = require('./db');
+    const processos = await connectProcessos();
+    const result = await processos.updateOne(
+      { _id: new ObjectId(processoId) },
+      { $set: { visto: true } }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Processo nao encontrado.' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao marcar processo como visto:', err);
+    return res.status(500).json({ error: 'Erro interno ao marcar como visto.' });
+  }
+});
+
+// POST /myhub/processos/arquivar — botao "Arquivar" do painel. NAO apaga o registro do Mongo:
+// so seta "arquivado: true", e o /myhub/processos/listar (find acima) passa a ignora-lo. O
+// dado cifrado continua no banco, só o servidor para de le-lo/mostra-lo no RHS.
+app.post('/myhub/processos/arquivar', requireAuth, async (req, res) => {
+  if (req.user.permission !== 'authentic') {
+    return res.status(403).json({ error: 'Acesso restrito a funcionarios.' });
+  }
+
+  const { processoId } = req.body || {};
+  if (!processoId) {
+    return res.status(400).json({ error: 'processoId ausente.' });
+  }
+
+  try {
+    const { ObjectId } = require('mongodb');
+    const { connectProcessos } = require('./db');
+    const processos = await connectProcessos();
+    const result = await processos.updateOne(
+      { _id: new ObjectId(processoId) },
+      { $set: { arquivado: true } }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Processo nao encontrado.' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao arquivar processo:', err);
+    return res.status(500).json({ error: 'Erro interno ao arquivar processo.' });
+  }
+});
+
 // GET /myhub/documento/rsa-temp — gera uma chave RSA temporaria (uso unico, 5min de validade)
 // pro app cifrar o pacote com. A chave privada correspondente nunca sai da RAM do server.
 app.get('/myhub/documento/rsa-temp', requireAuth, (req, res) => {
