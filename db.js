@@ -77,4 +77,17 @@ async function connectProcessos() {
   return processosCollection;
 }
 
-module.exports = { connect, connectRHs, connectVagas, connectProcessos };
+let financeiroCollection = null;
+
+// Coleção "Financeiro" — documento único (_id: 'geral') com entrada, saida e
+// saldo (patrimônio) acumulados. Persistido aqui; o timer que gera os
+// incrementos de saída roda em memória (ver finance.js).
+async function connectFinanceiro() {
+  if (financeiroCollection) return financeiroCollection;
+  const db = await ensureClientConnected();
+  financeiroCollection = db.collection('Financeiro');
+  console.log('Conectado ao MongoDB (' + DB_NAME + ') — collection Financeiro');
+  return financeiroCollection;
+}
+
+module.exports = { connect, connectRHs, connectVagas, connectProcessos, connectFinanceiro };
