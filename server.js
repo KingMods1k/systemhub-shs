@@ -1348,36 +1348,42 @@ btnLogout.addEventListener('click', async () => {
   const campoEndereco = document.getElementById('campoEndereco');
 
   // --- Mascaras: aplicam formatação progressiva conforme o usuario digita ---
-  function onlyDigits(str) { return str.replace(/\D/g, ''); }
+  function onlyDigits(str) {
+    let out = '';
+    for (const ch of str) {
+      if (ch >= '0' && ch <= '9') out += ch;
+    }
+    return out;
+  }
 
   function maskCpf(digits) {
     digits = digits.slice(0, 11);
     if (digits.length <= 3) return digits;
-    if (digits.length <= 6) return digits.replace(/(\d{3})(\d+)/, '$1.$2');
-    if (digits.length <= 9) return digits.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
-    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+    if (digits.length <= 6) return digits.slice(0, 3) + '.' + digits.slice(3);
+    if (digits.length <= 9) return digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6);
+    return digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-' + digits.slice(9);
   }
 
   function maskRg(digits) {
     digits = digits.slice(0, 9);
     if (digits.length <= 2) return digits;
-    if (digits.length <= 5) return digits.replace(/(\d{2})(\d+)/, '$1.$2');
-    if (digits.length <= 8) return digits.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
-    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+    if (digits.length <= 5) return digits.slice(0, 2) + '.' + digits.slice(2);
+    if (digits.length <= 8) return digits.slice(0, 2) + '.' + digits.slice(2, 5) + '.' + digits.slice(5);
+    return digits.slice(0, 2) + '.' + digits.slice(2, 5) + '.' + digits.slice(5, 8) + '-' + digits.slice(8);
   }
 
   function maskTel(digits) {
     digits = digits.slice(0, 11);
     if (digits.length <= 2) return digits;
-    if (digits.length <= 7) return digits.replace(/(\d{2})(\d+)/, '($1) $2');
-    return digits.replace(/(\d{2})(\d{5})(\d+)/, '($1) $2-$3');
+    if (digits.length <= 7) return '(' + digits.slice(0, 2) + ') ' + digits.slice(2);
+    return '(' + digits.slice(0, 2) + ') ' + digits.slice(2, 7) + '-' + digits.slice(7);
   }
 
   function maskData(digits) {
     digits = digits.slice(0, 6);
     if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return digits.replace(/(\d{2})(\d+)/, '$1/$2');
-    return digits.replace(/(\d{2})(\d{2})(\d+)/, '$1/$2/$3');
+    if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
   }
 
   campoCpf.addEventListener('input', () => { campoCpf.value = maskCpf(onlyDigits(campoCpf.value)); });
@@ -1398,7 +1404,11 @@ btnLogout.addEventListener('click', async () => {
   // --- Validação de CPF (dígitos verificadores) no client, espelhando o servidor ---
   function isValidCpf(digits) {
     if (digits.length !== 11) return false;
-    if (/^(\\d)\\1{10}$/.test(digits)) return false;
+    let allSame = true;
+    for (let i = 1; i < digits.length; i++) {
+      if (digits[i] !== digits[0]) { allSame = false; break; }
+    }
+    if (allSame) return false;
     const calcDigit = (base) => {
       let sum = 0, weight = base.length + 1;
       for (const ch of base) { sum += parseInt(ch, 10) * weight; weight -= 1; }
