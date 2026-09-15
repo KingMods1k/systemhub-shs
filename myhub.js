@@ -403,10 +403,6 @@ header{
 </div>
 
 <script>
-const navAdmitir = document.getElementById('navAdmitir');
-const emptyState = document.getElementById('emptyState');
-const panelAdmitir = document.getElementById('panelAdmitir');
-const dataInput = document.getElementById('f-data');
 
 dataInput.value = new Date().toISOString().slice(0, 10);
 
@@ -573,9 +569,21 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// --- Aba "Admitidos" ---
+// --- Navegação das abas ---
+const navAdmitir = document.getElementById('navAdmitir');
 const navAdmitidos = document.getElementById('navAdmitidos');
+const navProcessos = document.getElementById('navProcessos');
+
+const emptyState = document.getElementById('emptyState');
+
+const panelAdmitir = document.getElementById('panelAdmitir');
 const panelAdmitidos = document.getElementById('panelAdmitidos');
+const panelProcessos = document.getElementById('panelProcessos');
+
+// --- Aba "Admitir" ---
+const dataInput = document.getElementById('f-data');
+
+// --- Aba "Admitidos" ---
 const admitidosLista = document.getElementById('admitidosLista');
 const admitidosDetalhe = document.getElementById('admitidosDetalhe');
 const voltarLista = document.getElementById('voltarLista');
