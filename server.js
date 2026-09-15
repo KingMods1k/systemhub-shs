@@ -854,12 +854,18 @@ h1,h2,h3,.display{
 }
 
 /* ---------- nav ---------- */
+/* ---------- toolbar fixa ---------- */
 nav{
   position:fixed;top:0;left:0;right:0;z-index:100;
+  min-height:78px;
   display:flex;justify-content:space-between;align-items:center;
-  padding:26px 6vw;
-  mix-blend-mode:difference;
+  padding:14px 6vw;
+  background:rgba(10,10,12,.94);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
 }
+
 .nav-mark{font-family:'Bebas Neue';font-size:22px;letter-spacing:.08em}
 .nav-right{display:flex;align-items:center;gap:36px}
 .nav-links{display:flex;gap:36px;font-size:13px;letter-spacing:.04em}
@@ -927,7 +933,29 @@ nav{
 }
 .btn-whatsapp:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(37,211,102,.35)}
 .btn-whatsapp:active{transform:translateY(0) scale(.96)}
-@media (max-width:720px){.nav-links{display:none}}
+@media (max-width:720px){
+  nav{
+    min-height:72px;
+    padding:12px 5vw;
+  }
+  .nav-right{gap:12px}
+  .nav-links{
+    display:flex;
+    position:absolute;
+    left:0;
+    right:0;
+    top:72px;
+    gap:24px;
+    padding:10px 5vw;
+    overflow-x:auto;
+    white-space:nowrap;
+    background:rgba(10,10,12,.96);
+    border-bottom:1px solid var(--line);
+    scrollbar-width:none;
+  }
+  .nav-links::-webkit-scrollbar{display:none}
+  .nav-links a{font-size:12px;flex:none}
+}
 
 /* ---------- hero ---------- */
 .hero{
@@ -935,7 +963,7 @@ nav{
   display:flex;
   flex-direction:column;
   justify-content:flex-end;
-  padding:0 6vw 8vh;
+  padding:110px 6vw 8vh;
   position:relative;
   border-bottom:1px solid var(--line);
 }
@@ -976,6 +1004,10 @@ nav{
 }
 @keyframes fadeIn{to{opacity:1}}
 
+@media (max-width:720px){
+  .hero{padding:120px 5vw 8vh;}
+}
+
 .hero-meta{
   display:flex;gap:48px;margin-top:56px;
   opacity:0;animation:fadeIn 1s ease forwards;animation-delay:.95s;
@@ -984,7 +1016,11 @@ nav{
 .hero-meta strong{display:block;font-family:'Bebas Neue';font-size:28px;color:var(--text);letter-spacing:.02em}
 
 /* ---------- section shell ---------- */
-section{padding:140px 6vw;position:relative}
+section{
+  padding:140px 6vw;
+  position:relative;
+  scroll-margin-top:105px;
+}
 .section-alt{background:var(--bg-alt)}
 .eyebrow{font-size:13px;color:var(--gold);letter-spacing:.1em;margin-bottom:18px}
 .section-title{font-size:clamp(40px,6vw,84px);max-width:900px}
