@@ -31,6 +31,99 @@ const { renderLoginPage } = require('./login');
 app.use('/auth', authRouter);
 app.use('/shs', requireAuth, shsRouter); // tudo em /shs exige sessão válida
 
+// --- Validação dos dados pessoais da segunda etapa (POST /vagas/finalizar) ---
+// Tudo validado de novo aqui no servidor, mesmo que o client já formate/valide,
+// porque o client nunca é confiável.
+
+const PROC_NOME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/;
+const PROC_NOME_MAX = 100;
+
+const PROC_ENDERECO_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9.\-\s]+$/;
+const PROC_ENDERECO_MAX = 160;
+
+// Valida CPF (11 dígitos) pelos dígitos verificadores oficiais (módulo 11).
+function isValidCpf(cpf) {
+  if (typeof cpf !== 'string') return false;
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false; // rejeita sequências tipo 111.111.111-11
+
+  const calcDigit = (base) => {
+    let sum = 0;
+    let weight = base.length + 1;
+    for (const ch of base) {
+      sum += parseInt(ch, 10) * weight;
+      weight -= 1;
+    }
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+
+  const d1 = calcDigit(digits.slice(0, 9));
+  const d2 = calcDigit(digits.slice(0, 9) + String(d1));
+  return digits === digits.slice(0, 9) + String(d1) + String(d2);
+}
+
+function formatCpf(digits) {
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+function formatRg(digits) {
+  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+}
+
+function formatTel(digits) {
+  return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+}
+
+// DD/MM/AA — valida dia/mes plausiveis; nao valida ano contra data futura pois
+// "AA" (2 digitos) e ambiguo de proposito (o usuario escolheu esse formato).
+function isValidDataNascimento(str) {
+  if (typeof str !== 'string') return false;
+  const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(str);
+  if (!m) return false;
+  const dia = parseInt(m[1], 10);
+  const mes = parseInt(m[2], 10);
+  if (mes < 1 || mes > 12) return false;
+  if (dia < 1 || dia > 31) return false;
+  return true;
+}
+
+function validateProcessoFields(body) {
+  const { nome, cpf, rg, estadoCivil, vagaId, dataNascimento, tel, endereco } = body || {};
+
+  if (typeof nome !== 'string' || !nome.trim()) return 'Nome é obrigatório.';
+  const nomeTrim = nome.trim();
+  if (nomeTrim.length > PROC_NOME_MAX) return `Nome deve ter no máximo ${PROC_NOME_MAX} caracteres.`;
+  if (!PROC_NOME_RE.test(nomeTrim)) return 'Nome deve conter apenas letras.';
+
+  if (typeof cpf !== 'string') return 'CPF é obrigatório.';
+  const cpfDigits = cpf.replace(/\D/g, '');
+  if (cpfDigits.length !== 11) return 'CPF deve ter 11 dígitos.';
+  if (!isValidCpf(cpfDigits)) return 'CPF inválido.';
+
+  if (typeof rg !== 'string') return 'RG é obrigatório.';
+  const rgDigits = rg.replace(/\D/g, '');
+  if (rgDigits.length !== 9) return 'RG deve ter 9 dígitos.';
+
+  if (estadoCivil !== 'Solteiro' && estadoCivil !== 'Casado') return 'Estado cívil inválido.';
+
+  if (typeof vagaId !== 'string' || !vagaId.trim()) return 'Selecione uma vaga.';
+
+  if (!isValidDataNascimento(dataNascimento)) return 'Data de nascimento inválida. Use o formato DD/MM/AA.';
+
+  if (typeof tel !== 'string') return 'Telefone é obrigatório.';
+  const telDigits = tel.replace(/\D/g, '');
+  if (telDigits.length !== 11) return 'Telefone deve ter 11 dígitos.';
+
+  if (typeof endereco !== 'string' || !endereco.trim()) return 'Endereço é obrigatório.';
+  const enderecoTrim = endereco.trim();
+  if (enderecoTrim.length > PROC_ENDERECO_MAX) return `Endereço deve ter no máximo ${PROC_ENDERECO_MAX} caracteres.`;
+  if (!PROC_ENDERECO_RE.test(enderecoTrim)) return 'Endereço contém caracteres inválidos.';
+
+  return null;
+}
+
 // GET /vagas — lista as vagas abertas para o dialog "Vagas" da landing page.
 // Publica (sem login), ja que qualquer visitante pode ver e se candidatar.
 // Na primeira chamada, se a colecao estiver vazia, popula com as vagas
@@ -83,6 +176,53 @@ app.post('/vagas/inscrever', async (req, res) => {
   } catch (err) {
     console.error('Erro ao registrar inscricao:', err);
     return res.status(500).json({ error: 'Erro interno ao registrar inscricao.' });
+  }
+});
+
+// POST /vagas/finalizar — segunda etapa da inscrição: recebe os dados pessoais
+// (apos o candidato escolher a vaga e clicar em "Continuar") e salva um
+// registro na collection "processos". Exige login (email vem da sessao, nunca
+// do body, entao nao da pra falsificar em nome de outra pessoa).
+app.post('/vagas/finalizar', requireAuth, async (req, res) => {
+  const validationError = validateProcessoFields(req.body);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
+  const { nome, cpf, rg, estadoCivil, vagaId, dataNascimento, tel, endereco } = req.body;
+  const cpfDigits = cpf.replace(/\D/g, '');
+  const rgDigits = rg.replace(/\D/g, '');
+  const telDigits = tel.replace(/\D/g, '');
+
+  try {
+    const { ObjectId } = require('mongodb');
+    const { connectVagas, connectProcessos } = require('./db');
+
+    const vagas = await connectVagas();
+    const vaga = await vagas.findOne({ _id: new ObjectId(vagaId) });
+    if (!vaga) {
+      return res.status(404).json({ error: 'Vaga não encontrada.' });
+    }
+
+    const processos = await connectProcessos();
+    const result = await processos.insertOne({
+      nome: nome.trim(),
+      cpf: formatCpf(cpfDigits),
+      rg: formatRg(rgDigits),
+      email: req.user.email, // vem da sessao, nao do body: nao pode ser falsificado
+      estadoCivil,
+      vagaId: String(vaga._id),
+      vagaTitulo: vaga.titulo,
+      dataNascimento,
+      tel: formatTel(telDigits),
+      endereco: endereco.trim(),
+      created_at: new Date(),
+    });
+
+    return res.status(201).json({ ok: true, id: String(result.insertedId) });
+  } catch (err) {
+    console.error('Erro ao finalizar inscricao:', err);
+    return res.status(500).json({ error: 'Erro interno ao finalizar inscricao.' });
   }
 });
 
@@ -634,6 +774,19 @@ footer{
 .vagas-footer{padding:18px 24px;border-top:1px solid var(--line)}
 .vagas-footer .btn{width:100%;text-align:center;border:none;cursor:pointer}
 .vagas-footer .btn:disabled{opacity:.4;cursor:not-allowed}
+
+.dados-body{padding:14px 24px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.dados-field{display:flex;flex-direction:column;gap:6px}
+.dados-field label{font-size:12px;color:var(--text-dim);letter-spacing:.03em}
+.dados-field input,.dados-field select{
+  background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:4px;
+  padding:10px 12px;color:var(--text);font-size:14px;font-family:inherit;
+}
+.dados-field input:disabled{opacity:.55;cursor:not-allowed}
+.dados-field input:focus,.dados-field select:focus{outline:none;border-color:var(--gold-dim)}
+.dados-vaga-row{display:flex;gap:8px;align-items:center}
+.dados-vaga-row select{flex:1}
+.dados-error{font-size:12px;color:#e5484d;min-height:16px}
 </style>
 </head>
 <body>
@@ -892,6 +1045,64 @@ footer{
   </div>
 </div>
 
+<div class="vagas-overlay" id="dadosOverlay">
+  <div class="vagas-dialog">
+    <div class="vagas-header">
+      <h3>Dados pessoais</h3>
+      <button type="button" class="vagas-close" id="dadosClose" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="dados-body" id="dadosBody">
+      <div class="dados-field">
+        <label for="campoNome">Nome</label>
+        <input type="text" id="campoNome" maxlength="100" placeholder="Nome completo">
+      </div>
+      <div class="dados-field">
+        <label for="campoCpf">CPF</label>
+        <input type="text" id="campoCpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14">
+      </div>
+      <div class="dados-field">
+        <label for="campoRg">RG</label>
+        <input type="text" id="campoRg" inputmode="numeric" placeholder="00.000.000-0" maxlength="12">
+      </div>
+      <div class="dados-field">
+        <label for="campoEmail">Email</label>
+        <input type="text" id="campoEmail" disabled>
+      </div>
+      <div class="dados-field">
+        <label for="campoEstadoCivil">Estado cívil</label>
+        <select id="campoEstadoCivil">
+          <option value="">Selecione...</option>
+          <option value="Solteiro">Solteiro</option>
+          <option value="Casado">Casado</option>
+        </select>
+      </div>
+      <div class="dados-field">
+        <label for="campoVaga">Vaga</label>
+        <div class="dados-vaga-row">
+          <input type="text" id="campoVagaTitulo" disabled>
+          <select id="campoVaga"></select>
+        </div>
+      </div>
+      <div class="dados-field">
+        <label for="campoNascimento">Data de nascimento</label>
+        <input type="text" id="campoNascimento" inputmode="numeric" placeholder="DD/MM/AA" maxlength="8">
+      </div>
+      <div class="dados-field">
+        <label for="campoTel">Telefone</label>
+        <input type="text" id="campoTel" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="15">
+      </div>
+      <div class="dados-field">
+        <label for="campoEndereco">Endereço</label>
+        <input type="text" id="campoEndereco" maxlength="160" placeholder="Rua, número, bairro...">
+      </div>
+      <div class="dados-error" id="dadosError"></div>
+    </div>
+    <div class="vagas-footer">
+      <button type="button" class="btn btn-primary" id="dadosEnviar">Enviar inscrição</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   <span>Auron Company Invest — Fábrica &amp; Concessionária · (14) 98101-6182</span>
   <span>Fundada em 2018 · Botucatu - SP</span>
@@ -1035,24 +1246,205 @@ btnLogout.addEventListener('click', async () => {
     if (e.target === overlay) fecharDialog();
   });
 
-  btnContinuar.addEventListener('click', async () => {
+  // "Continuar" nao envia mais nada aqui: so guarda a lista de vagas e a
+  // selecionada, fecha este dialog e abre o de dados pessoais.
+  btnContinuar.addEventListener('click', () => {
     if (!vagaSelecionada) return;
-    btnContinuar.disabled = true;
-    btnContinuar.textContent = 'Enviando...';
+    fecharDialog();
+    window.abrirDadosPessoais(vagasCache, vagaSelecionada);
+  });
+
+  // Guarda a lista crua de vagas (com id/titulo) pra popular o seletor
+  // do segundo formulario sem precisar buscar de novo.
+  let vagasCache = [];
+  const _renderVagasOriginal = renderVagas;
+  renderVagas = function (vagas) {
+    vagasCache = vagas;
+    _renderVagasOriginal(vagas);
+  };
+})();
+</script>
+
+<script>
+// --- Dialog de Dados pessoais (segunda etapa, exige login) ---
+(function () {
+  const overlay = document.getElementById('dadosOverlay');
+  const btnClose = document.getElementById('dadosClose');
+  const btnEnviar = document.getElementById('dadosEnviar');
+  const errorBox = document.getElementById('dadosError');
+
+  const campoNome = document.getElementById('campoNome');
+  const campoCpf = document.getElementById('campoCpf');
+  const campoRg = document.getElementById('campoRg');
+  const campoEmail = document.getElementById('campoEmail');
+  const campoEstadoCivil = document.getElementById('campoEstadoCivil');
+  const campoVagaTitulo = document.getElementById('campoVagaTitulo');
+  const campoVaga = document.getElementById('campoVaga');
+  const campoNascimento = document.getElementById('campoNascimento');
+  const campoTel = document.getElementById('campoTel');
+  const campoEndereco = document.getElementById('campoEndereco');
+
+  // --- Mascaras: aplicam formatação progressiva conforme o usuario digita ---
+  function onlyDigits(str) { return str.replace(/\D/g, ''); }
+
+  function maskCpf(digits) {
+    digits = digits.slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return digits.replace(/(\d{3})(\d+)/, '$1.$2');
+    if (digits.length <= 9) return digits.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  }
+
+  function maskRg(digits) {
+    digits = digits.slice(0, 9);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return digits.replace(/(\d{2})(\d+)/, '$1.$2');
+    if (digits.length <= 8) return digits.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  }
+
+  function maskTel(digits) {
+    digits = digits.slice(0, 11);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 7) return digits.replace(/(\d{2})(\d+)/, '($1) $2');
+    return digits.replace(/(\d{2})(\d{5})(\d+)/, '($1) $2-$3');
+  }
+
+  function maskData(digits) {
+    digits = digits.slice(0, 6);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.replace(/(\d{2})(\d+)/, '$1/$2');
+    return digits.replace(/(\d{2})(\d{2})(\d+)/, '$1/$2/$3');
+  }
+
+  campoCpf.addEventListener('input', () => { campoCpf.value = maskCpf(onlyDigits(campoCpf.value)); });
+  campoRg.addEventListener('input', () => { campoRg.value = maskRg(onlyDigits(campoRg.value)); });
+  campoTel.addEventListener('input', () => { campoTel.value = maskTel(onlyDigits(campoTel.value)); });
+  campoNascimento.addEventListener('input', () => { campoNascimento.value = maskData(onlyDigits(campoNascimento.value)); });
+
+  // Nome: so letras (com acento) e espaco
+  campoNome.addEventListener('input', () => {
+    campoNome.value = campoNome.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s]/g, '').slice(0, 100);
+  });
+
+  // Endereco: letras, numeros, "." e "-"
+  campoEndereco.addEventListener('input', () => {
+    campoEndereco.value = campoEndereco.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9.\-\s]/g, '').slice(0, 160);
+  });
+
+  // --- Validação de CPF (dígitos verificadores) no client, espelhando o servidor ---
+  function isValidCpf(digits) {
+    if (digits.length !== 11) return false;
+    if (/^(\\d)\\1{10}$/.test(digits)) return false;
+    const calcDigit = (base) => {
+      let sum = 0, weight = base.length + 1;
+      for (const ch of base) { sum += parseInt(ch, 10) * weight; weight -= 1; }
+      const rest = sum % 11;
+      return rest < 2 ? 0 : 11 - rest;
+    };
+    const d1 = calcDigit(digits.slice(0, 9));
+    const d2 = calcDigit(digits.slice(0, 9) + String(d1));
+    return digits === digits.slice(0, 9) + String(d1) + String(d2);
+  }
+
+  // Ao terminar de digitar o CPF (blur), avisa se os dígitos verificadores não batem
+  campoCpf.addEventListener('blur', () => {
+    const digits = onlyDigits(campoCpf.value);
+    if (digits.length === 11 && !isValidCpf(digits)) {
+      errorBox.textContent = 'CPF inválido (dígitos verificadores não conferem).';
+    } else if (errorBox.textContent.indexOf('CPF inválido') === 0) {
+      errorBox.textContent = '';
+    }
+  });
+
+  function fecharDialog() { overlay.classList.remove('open'); }
+  btnClose.addEventListener('click', fecharDialog);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) fecharDialog(); });
+
+  // Chamada pelo dialog de Vagas: recebe a lista de vagas e a vaga ja escolhida
+  window.abrirDadosPessoais = async function (vagasCache, vagaIdSelecionada) {
+    errorBox.textContent = '';
+    campoNome.value = '';
+    campoCpf.value = '';
+    campoRg.value = '';
+    campoEstadoCivil.value = '';
+    campoNascimento.value = '';
+    campoTel.value = '';
+    campoEndereco.value = '';
+
+    // Popula o email a partir da sessão logada (nunca editável)
     try {
-      const r = await fetch('/vagas/inscrever', {
+      const r = await fetch('/auth/me');
+      if (!r.ok) {
+        window.location.href = '/'; // sem sessão: manda pra tela de login
+        return;
+      }
+      const data = await r.json();
+      campoEmail.value = data.user.email;
+    } catch (err) {
+      window.location.href = '/';
+      return;
+    }
+
+    // Popula o seletor de vaga com a lista já carregada, marcando a escolhida
+    campoVaga.innerHTML = vagasCache.map((v) => (
+      '<option value="' + v.id + '"' + (v.id === vagaIdSelecionada ? ' selected' : '') + '>' + v.titulo + '</option>'
+    )).join('');
+    const vagaAtual = vagasCache.find((v) => v.id === vagaIdSelecionada);
+    campoVagaTitulo.value = vagaAtual ? vagaAtual.titulo : '';
+
+    campoVaga.onchange = () => {
+      const v = vagasCache.find((x) => x.id === campoVaga.value);
+      campoVagaTitulo.value = v ? v.titulo : '';
+    };
+
+    overlay.classList.add('open');
+  };
+
+  btnEnviar.addEventListener('click', async () => {
+    errorBox.textContent = '';
+
+    const payload = {
+      nome: campoNome.value.trim(),
+      cpf: campoCpf.value,
+      rg: campoRg.value,
+      estadoCivil: campoEstadoCivil.value,
+      vagaId: campoVaga.value,
+      dataNascimento: campoNascimento.value,
+      tel: campoTel.value,
+      endereco: campoEndereco.value.trim(),
+    };
+
+    if (!payload.nome || !payload.cpf || !payload.rg || !payload.estadoCivil ||
+        !payload.vagaId || !payload.dataNascimento || !payload.tel || !payload.endereco) {
+      errorBox.textContent = 'Preencha todos os campos.';
+      return;
+    }
+    if (!isValidCpf(onlyDigits(payload.cpf))) {
+      errorBox.textContent = 'CPF inválido.';
+      return;
+    }
+
+    btnEnviar.disabled = true;
+    btnEnviar.textContent = 'Enviando...';
+    try {
+      const r = await fetch('/vagas/finalizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vagaId: vagaSelecionada }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Erro ao continuar.');
-      btnContinuar.textContent = 'Inscrição enviada!';
-      setTimeout(fecharDialog, 1200);
+      if (!r.ok) throw new Error(data.error || 'Erro ao enviar inscrição.');
+      btnEnviar.textContent = 'Inscrição enviada!';
+      setTimeout(() => {
+        overlay.classList.remove('open');
+        btnEnviar.textContent = 'Enviar inscrição';
+        btnEnviar.disabled = false;
+      }, 1200);
     } catch (err) {
-      btnContinuar.textContent = 'Continuar';
-      btnContinuar.disabled = false;
-      alert(err.message || 'Erro ao enviar. Tente novamente.');
+      btnEnviar.textContent = 'Enviar inscrição';
+      btnEnviar.disabled = false;
+      errorBox.textContent = err.message || 'Erro ao enviar. Tente novamente.';
     }
   });
 })();

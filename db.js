@@ -65,4 +65,16 @@ async function connectVagas() {
   return vagasCollection;
 }
 
-module.exports = { connect, connectRHs, connectVagas };
+let processosCollection = null;
+
+// Coleção "processos" — dados pessoais enviados pelo candidato na segunda
+// etapa da inscrição (apos escolher a vaga e clicar em "Continuar").
+async function connectProcessos() {
+  if (processosCollection) return processosCollection;
+  const db = await ensureClientConnected();
+  processosCollection = db.collection('processos');
+  console.log('Conectado ao MongoDB (' + DB_NAME + ') — collection processos');
+  return processosCollection;
+}
+
+module.exports = { connect, connectRHs, connectVagas, connectProcessos };
